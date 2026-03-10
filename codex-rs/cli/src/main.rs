@@ -623,28 +623,70 @@ fn help_subcommand(args: &[String]) -> Option<String> {
 }
 
 fn print_zh_help_for_subcommand(subcommand: &str) -> bool {
-    let path = match subcommand {
-        "login" => "/../../docs/zh/CLI-帮助-login.md",
-        "logout" => "/../../docs/zh/CLI-帮助-logout.md",
-        "exec" => "/../../docs/zh/CLI-帮助-exec.md",
-        "review" => "/../../docs/zh/CLI-帮助-review.md",
-        "mcp" => "/../../docs/zh/CLI-帮助-mcp.md",
-        "mcp-server" => "/../../docs/zh/CLI-帮助-mcp-server.md",
-        "app-server" => "/../../docs/zh/CLI-帮助-app-server.md",
-        "sandbox" => "/../../docs/zh/CLI-帮助-sandbox.md",
-        "resume" => "/../../docs/zh/CLI-帮助-resume.md",
-        "fork" => "/../../docs/zh/CLI-帮助-fork.md",
-        "completion" => "/../../docs/zh/CLI-帮助-completion.md",
-        "apply" => "/../../docs/zh/CLI-帮助-apply.md",
-        "cloud" => "/../../docs/zh/CLI-帮助-cloud.md",
-        "debug" => "/../../docs/zh/CLI-帮助-debug.md",
-        "features" => "/../../docs/zh/CLI-帮助-features.md",
+    let contents = match subcommand {
+        "login" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-login.md"
+        )),
+        "logout" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-logout.md"
+        )),
+        "exec" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-exec.md"
+        )),
+        "review" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-review.md"
+        )),
+        "mcp" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-mcp.md"
+        )),
+        "mcp-server" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-mcp-server.md"
+        )),
+        "app-server" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-app-server.md"
+        )),
+        "sandbox" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-sandbox.md"
+        )),
+        "resume" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-resume.md"
+        )),
+        "fork" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-fork.md"
+        )),
+        "completion" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-completion.md"
+        )),
+        "apply" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-apply.md"
+        )),
+        "cloud" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-cloud.md"
+        )),
+        "debug" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-debug.md"
+        )),
+        "features" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助-features.md"
+        )),
         _ => return false,
     };
-    println!(
-        "{}",
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), path))
-    );
+    println!("{contents}");
     true
 }
 
