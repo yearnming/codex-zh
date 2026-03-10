@@ -1,0 +1,84 @@
+name: rust-release-zh
+
+on:
+  push:
+    tags:
+      - "zh-v*.*.*"
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build - ${{ matrix.runner }} - ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: codex-rs
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            exe: ""
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            exe: ""
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            exe: ""
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            exe: ".exe"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          targets: ${{ matrix.target }}
+      - name: Cargo build (release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --target ${{ matrix.target }} --bin codex --bin codex-responses-api-proxy
+      - name: Stage artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${GITHUB_WORKSPACE}/dist/${{ matrix.target }}"
+          mkdir -p "${dest}"
+          cp "target/${{ matrix.target }}/release/codex${{ matrix.exe }}" "${dest}/codex-${{ matrix.target }}${{ matrix.exe }}"
+          cp "target/${{ matrix.target }}/release/codex-responses-api-proxy${{ matrix.exe }}" "${dest}/codex-responses-api-proxy-${{ matrix.target }}${{ matrix.exe }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rust-release-zh-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/*
+
+  release:
+    needs: build
+    name: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+      - name: Define release name
+        id: release_name
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#zh-v}"
+          echo "name=${version}" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.release_name.outputs.name }}
+          tag_name: ${{ github.ref_name }}
+          files: dist/**
+          generate_release_notes: true
+          prerelease: ${{ contains(steps.release_name.outputs.name, '-') }}
