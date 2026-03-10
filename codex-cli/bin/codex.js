@@ -2,7 +2,7 @@
 // Unified entry point for the Codex CLI.
 
 import { spawn } from "node:child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { createRequire } from "node:module";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,6 +11,58 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
+
+function normalizeLocale(value) {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.replace(".", "-").replace("_", "-");
+  if (normalized.toLowerCase().startsWith("zh")) {
+    return "zh-CN";
+  }
+  return null;
+}
+
+function detectLocale() {
+  if (process.env.CODEX_LOCALE) {
+    return normalizeLocale(process.env.CODEX_LOCALE);
+  }
+  return normalizeLocale(
+    process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || "",
+  );
+}
+
+function loadTranslations(locale) {
+  if (locale !== "zh-CN") {
+    return null;
+  }
+  try {
+    const filePath = path.join(__dirname, "zh-CN.json");
+    const raw = readFileSync(filePath, "utf8");
+    const data = JSON.parse(raw);
+    return data && data.strings ? data.strings : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatTemplate(template, vars) {
+  return template.replace(/\{(\w+)\}/g, (match, key) => {
+    if (vars && Object.prototype.hasOwnProperty.call(vars, key)) {
+      return String(vars[key]);
+    }
+    return match;
+  });
+}
+
+const locale = detectLocale();
+const translations = loadTranslations(locale);
+const t = (key, vars, fallback) => {
+  if (translations && translations[key]) {
+    return formatTemplate(translations[key], vars);
+  }
+  return fallback;
+};
 
 const PLATFORM_PACKAGE_BY_TARGET = {
   "x86_64-unknown-linux-musl": "@openai/codex-linux-x64",
@@ -67,12 +119,24 @@ switch (platform) {
 }
 
 if (!targetTriple) {
-  throw new Error(`Unsupported platform: ${platform} (${arch})`);
+  throw new Error(
+    t(
+      "codex_cli.error.unsupported_platform",
+      { platform, arch },
+      `Unsupported platform: ${platform} (${arch})`,
+    ),
+  );
 }
 
 const platformPackage = PLATFORM_PACKAGE_BY_TARGET[targetTriple];
 if (!platformPackage) {
-  throw new Error(`Unsupported target triple: ${targetTriple}`);
+  throw new Error(
+    t(
+      "codex_cli.error.unsupported_target_triple",
+      { targetTriple },
+      `Unsupported target triple: ${targetTriple}`,
+    ),
+  );
 }
 
 const codexBinaryName = process.platform === "win32" ? "codex.exe" : "codex";
@@ -98,7 +162,11 @@ try {
         ? "bun install -g @openai/codex@latest"
         : "npm install -g @openai/codex@latest";
     throw new Error(
-      `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
+      t(
+        "codex_cli.error.missing_optional_dependency",
+        { platformPackage, updateCommand },
+        `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
+      ),
     );
   }
 }
@@ -110,7 +178,11 @@ if (!vendorRoot) {
       ? "bun install -g @openai/codex@latest"
       : "npm install -g @openai/codex@latest";
   throw new Error(
-    `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
+    t(
+      "codex_cli.error.missing_optional_dependency",
+      { platformPackage, updateCommand },
+      `Missing optional dependency ${platformPackage}. Reinstall Codex: ${updateCommand}`,
+    ),
   );
 }
 

@@ -15,3 +15,7 @@
 - 上游更新后，`l10n/zh` 通过 rebase 重放中文化补丁。
 - 详细流程见项目方案文档。
 
+## 语言切换
+当前支持通过环境变量启用中文错误提示：
+- `CODEX_LOCALE=zh-CN`
+- 或设置系统语言为中文（`LANG/LC_ALL/LC_MESSAGES` 含 `zh`）

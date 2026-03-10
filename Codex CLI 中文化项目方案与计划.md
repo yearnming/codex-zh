@@ -52,11 +52,11 @@
 | 1 | 创建项目方案与计划文档 | 我 | 已完成 | 本文档 |
 | 2 | 明确上游仓库地址与许可证 | 待定 | 已完成 | 已确认上游地址与许可证 |
 | 3 | 选定同步策略（A 或 B） | 待定 | 已完成 | 采用方案 A |
-| 4 | 初始化 GitHub 仓库与分支结构 | 待定 | 进行中 | `main` 已对齐 upstream，`l10n/zh` 待 rebase 到 upstream/main |
+| 4 | 初始化 GitHub 仓库与分支结构 | 待定 | 已完成 | `main` 已对齐 upstream，`l10n/zh` 已 rebase 并推送 |
 | 5 | 设计中文化资源结构（如 `locales/zh.json`） | 待定 | 已完成 | 已建立 `locales/` 与中文规范 |
 | 6 | 建立上游同步脚本 | 待定 | 已完成 | `scripts/sync_upstream.sh` |
 | 7 | 配置 GitHub Actions 自动同步 | 待定 | 已完成 | `.github/workflows/sync-upstream.yml` |
-| 8 | 初版中文化覆盖（核心交互与帮助） | 待定 | 待办 | |
+| 8 | 初版中文化覆盖（核心交互与帮助） | 待定 | 进行中 | 已覆盖入口层错误提示 |
 | 9 | 发布 v1 中文化版本 | 待定 | 待办 | |
 | 10 | 建立贡献流程与翻译规范 | 待定 | 已完成 | `CONTRIBUTING.zh-CN.md` + `docs/zh/翻译规范.md` |
 

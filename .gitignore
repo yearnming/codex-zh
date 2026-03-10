@@ -130,6 +130,8 @@ date/
 
 # Go
 bin/
+!codex-cli/bin/
+!codex-cli/bin/zh-CN.json
 # pkg/
 vendor/
 *.exe
