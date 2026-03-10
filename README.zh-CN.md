@@ -9,6 +9,7 @@
 ## 本地化资源
 - 资源文件：`locales/zh-CN.json`
 - 翻译规范：`docs/zh/翻译规范.md`
+- 中文帮助：`docs/zh/CLI-帮助.md`
 - 贡献指南：`CONTRIBUTING.zh-CN.md`
 
 ## 同步说明
@@ -16,6 +17,7 @@
 - 详细流程见项目方案文档。
 
 ## 语言切换
-当前支持通过环境变量启用中文错误提示：
+当前支持通过环境变量启用中文错误提示，并输出中文帮助摘要：
 - `CODEX_LOCALE=zh-CN`
 - 或设置系统语言为中文（`LANG/LC_ALL/LC_MESSAGES` 含 `zh`）
+启用后执行 `codex --help` 会显示中文帮助摘要（子命令帮助仍为英文）。

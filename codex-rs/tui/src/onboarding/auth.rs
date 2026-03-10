@@ -32,6 +32,7 @@ use ratatui::widgets::Wrap;
 
 use codex_core::auth::AuthMode;
 use codex_protocol::config_types::ForcedLoginMethod;
+use std::env;
 use std::sync::RwLock;
 
 use crate::LoginStatus;
@@ -100,7 +101,52 @@ pub(crate) enum SignInOption {
     ApiKey,
 }
 
-const API_KEY_DISABLED_MESSAGE: &str = "API key login is disabled.";
+const API_KEY_DISABLED_MESSAGE_EN: &str = "API key login is disabled.";
+const API_KEY_DISABLED_MESSAGE_ZH: &str = "API key 登录已被禁用。";
+const API_KEY_EMPTY_MESSAGE_EN: &str = "API key cannot be empty";
+const API_KEY_EMPTY_MESSAGE_ZH: &str = "API key 不能为空";
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn api_key_disabled_message() -> &'static str {
+    if is_zh_locale() {
+        API_KEY_DISABLED_MESSAGE_ZH
+    } else {
+        API_KEY_DISABLED_MESSAGE_EN
+    }
+}
+
+fn api_key_empty_message() -> &'static str {
+    if is_zh_locale() {
+        API_KEY_EMPTY_MESSAGE_ZH
+    } else {
+        API_KEY_EMPTY_MESSAGE_EN
+    }
+}
+
+fn api_key_save_failed_message(err: &str) -> String {
+    if is_zh_locale() {
+        format!("保存 API key 失败：{err}")
+    } else {
+        format!("Failed to save API key: {err}")
+    }
+}
 
 #[derive(Clone, Default)]
 pub(crate) struct ApiKeyInputState {
@@ -285,7 +331,7 @@ impl AuthModeWidget {
 
     fn disallow_api_login(&mut self) {
         self.highlighted_mode = SignInOption::ChatGpt;
-        self.error = Some(API_KEY_DISABLED_MESSAGE.to_string());
+        self.error = Some(api_key_disabled_message().to_string());
         *self.sign_in_state.write().unwrap() = SignInState::PickMode;
         self.request_frame.schedule_frame();
     }
@@ -568,7 +614,7 @@ impl AuthModeWidget {
                     KeyCode::Enter => {
                         let trimmed = state.value.trim().to_string();
                         if trimmed.is_empty() {
-                            self.error = Some("API key cannot be empty".to_string());
+                            self.error = Some(api_key_empty_message().to_string());
                             should_request_frame = true;
                         } else {
                             should_save = Some(trimmed);
@@ -685,7 +731,7 @@ impl AuthModeWidget {
                 *self.sign_in_state.write().unwrap() = SignInState::ApiKeyConfigured;
             }
             Err(err) => {
-                self.error = Some(format!("Failed to save API key: {err}"));
+                self.error = Some(api_key_save_failed_message(&err.to_string()));
                 let mut guard = self.sign_in_state.write().unwrap();
                 if let SignInState::ApiKeyEntry(existing) = &mut *guard {
                     if existing.value.is_empty() {
@@ -866,7 +912,7 @@ mod tests {
 
         widget.start_api_key_entry();
 
-        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE));
+        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE_EN));
         assert!(matches!(
             &*widget.sign_in_state.read().unwrap(),
             SignInState::PickMode
@@ -879,7 +925,7 @@ mod tests {
 
         widget.save_api_key("sk-test".to_string());
 
-        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE));
+        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE_EN));
         assert!(matches!(
             &*widget.sign_in_state.read().unwrap(),
             SignInState::PickMode

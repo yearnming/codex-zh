@@ -30,6 +30,7 @@ use codex_tui::ExitReason;
 use codex_tui::update_action::UpdateAction;
 use codex_utils_cli::CliConfigOverrides;
 use owo_colors::OwoColorize;
+use std::env;
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use supports_color::Stream;
@@ -550,6 +551,57 @@ fn stage_str(stage: codex_core::features::Stage) -> &'static str {
     }
 }
 
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn should_print_zh_help(args: &[String]) -> bool {
+    if !is_zh_locale() {
+        return false;
+    }
+    let mut has_help = false;
+    let mut has_subcommand = false;
+    for (idx, arg) in args.iter().enumerate() {
+        if idx == 0 {
+            continue;
+        }
+        if arg == "-h" || arg == "--help" {
+            has_help = true;
+            continue;
+        }
+        if arg.starts_with('-') {
+            continue;
+        }
+        has_subcommand = true;
+        break;
+    }
+    has_help && !has_subcommand
+}
+
+fn print_zh_help() {
+    println!(
+        "{}",
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../docs/zh/CLI-帮助.md"
+        ))
+    );
+}
+
 fn main() -> anyhow::Result<()> {
     arg0_dispatch_or_else(|arg0_paths: Arg0DispatchPaths| async move {
         cli_main(arg0_paths).await?;
@@ -558,6 +610,12 @@ fn main() -> anyhow::Result<()> {
 }
 
 async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
+    let args: Vec<String> = env::args().collect();
+    if should_print_zh_help(&args) {
+        print_zh_help();
+        return Ok(());
+    }
+
     let MultitoolCli {
         config_overrides: mut root_config_overrides,
         feature_toggles,

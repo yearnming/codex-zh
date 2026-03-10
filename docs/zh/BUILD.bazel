@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "cli_help_zh",
+    srcs = ["CLI-帮助.md"],
+)
