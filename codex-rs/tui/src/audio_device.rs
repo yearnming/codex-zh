@@ -1,12 +1,79 @@
 use codex_core::config::Config;
 use cpal::traits::DeviceTrait;
 use cpal::traits::HostTrait;
+use std::env;
 use tracing::warn;
 
 use crate::app_event::RealtimeAudioDeviceKind;
 
 const PREFERRED_INPUT_SAMPLE_RATE: u32 = 24_000;
 const PREFERRED_INPUT_CHANNELS: u16 = 1;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn err_enumerate_input_configs(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("枚举输入音频配置失败：{err}")
+    } else {
+        format!("failed to enumerate input audio configs: {err}")
+    }
+}
+
+fn err_default_input_config(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("获取默认输入音频配置失败：{err}")
+    } else {
+        format!("failed to get default input config: {err}")
+    }
+}
+
+fn err_default_output_config(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("获取默认输出音频配置失败：{err}")
+    } else {
+        format!("failed to get default output config: {err}")
+    }
+}
+
+fn err_enumerate_input_devices(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("枚举输入音频设备失败：{err}")
+    } else {
+        format!("failed to enumerate input audio devices: {err}")
+    }
+}
+
+fn err_enumerate_output_devices(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("枚举输出音频设备失败：{err}")
+    } else {
+        format!("failed to enumerate output audio devices: {err}")
+    }
+}
+
+fn err_missing_default_input_config() -> String {
+    if is_zh_locale() {
+        "无法获取默认输入音频配置".to_string()
+    } else {
+        "failed to get default input config".to_string()
+    }
+}
 
 pub(crate) fn list_realtime_audio_device_names(
     kind: RealtimeAudioDeviceKind,
@@ -41,7 +108,7 @@ pub(crate) fn preferred_input_config(
 ) -> Result<cpal::SupportedStreamConfig, String> {
     let supported_configs = device
         .supported_input_configs()
-        .map_err(|err| format!("failed to enumerate input audio configs: {err}"))?;
+        .map_err(|err| err_enumerate_input_configs(&err))?;
 
     supported_configs
         .filter_map(|range| {
@@ -62,7 +129,7 @@ pub(crate) fn preferred_input_config(
         .min_by_key(|(score, _)| *score)
         .map(|(_, config)| config)
         .or_else(|| device.default_input_config().ok())
-        .ok_or_else(|| "failed to get default input config".to_string())
+        .ok_or_else(err_missing_default_input_config)
 }
 
 fn select_device_and_config(
@@ -115,11 +182,11 @@ fn devices(host: &cpal::Host, kind: RealtimeAudioDeviceKind) -> Result<Vec<cpal:
         RealtimeAudioDeviceKind::Microphone => host
             .input_devices()
             .map(|devices| devices.collect())
-            .map_err(|err| format!("failed to enumerate input audio devices: {err}")),
+            .map_err(|err| err_enumerate_input_devices(&err)),
         RealtimeAudioDeviceKind::Speaker => host
             .output_devices()
             .map(|devices| devices.collect())
-            .map_err(|err| format!("failed to enumerate output audio devices: {err}")),
+            .map_err(|err| err_enumerate_output_devices(&err)),
     }
 }
 
@@ -137,10 +204,10 @@ fn default_config(
     match kind {
         RealtimeAudioDeviceKind::Microphone => device
             .default_input_config()
-            .map_err(|err| format!("failed to get default input config: {err}")),
+            .map_err(|err| err_default_input_config(&err)),
         RealtimeAudioDeviceKind::Speaker => device
             .default_output_config()
-            .map_err(|err| format!("failed to get default output config: {err}")),
+            .map_err(|err| err_default_output_config(&err)),
     }
 }
 
@@ -159,18 +226,40 @@ fn preferred_input_sample_rate(range: &cpal::SupportedStreamConfigRange) -> cpal
 fn missing_device_error(kind: RealtimeAudioDeviceKind, configured_name: Option<&str>) -> String {
     match (kind, configured_name) {
         (RealtimeAudioDeviceKind::Microphone, Some(name)) => {
-            format!(
-                "configured microphone `{name}` was unavailable and no default input audio device was found"
-            )
+            if is_zh_locale() {
+                format!(
+                    "配置的麦克风 `{name}` 不可用，且未找到默认输入音频设备"
+                )
+            } else {
+                format!(
+                    "configured microphone `{name}` was unavailable and no default input audio device was found"
+                )
+            }
         }
         (RealtimeAudioDeviceKind::Speaker, Some(name)) => {
-            format!(
-                "configured speaker `{name}` was unavailable and no default output audio device was found"
-            )
+            if is_zh_locale() {
+                format!(
+                    "配置的扬声器 `{name}` 不可用，且未找到默认输出音频设备"
+                )
+            } else {
+                format!(
+                    "configured speaker `{name}` was unavailable and no default output audio device was found"
+                )
+            }
         }
         (RealtimeAudioDeviceKind::Microphone, None) => {
-            "no input audio device available".to_string()
+            if is_zh_locale() {
+                "没有可用的输入音频设备".to_string()
+            } else {
+                "no input audio device available".to_string()
+            }
         }
-        (RealtimeAudioDeviceKind::Speaker, None) => "no output audio device available".to_string(),
+        (RealtimeAudioDeviceKind::Speaker, None) => {
+            if is_zh_locale() {
+                "没有可用的输出音频设备".to_string()
+            } else {
+                "no output audio device available".to_string()
+            }
+        }
     }
 }

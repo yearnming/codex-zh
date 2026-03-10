@@ -1,4 +1,5 @@
 use super::*;
+use std::env;
 use codex_protocol::protocol::ConversationStartParams;
 use codex_protocol::protocol::RealtimeAudioFrame;
 use codex_protocol::protocol::RealtimeConversationClosedEvent;
@@ -7,6 +8,56 @@ use codex_protocol::protocol::RealtimeConversationStartedEvent;
 use codex_protocol::protocol::RealtimeEvent;
 
 const REALTIME_CONVERSATION_PROMPT: &str = "You are in a realtime voice conversation in the Codex TUI. Respond conversationally and concisely.";
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn realtime_voice_error(message: &str) -> String {
+    if is_zh_locale() {
+        format!("实时语音错误：{message}")
+    } else {
+        format!("Realtime voice error: {message}")
+    }
+}
+
+fn realtime_voice_closed(reason: &str) -> String {
+    if is_zh_locale() {
+        format!("实时语音模式已关闭：{reason}")
+    } else {
+        format!("Realtime voice mode closed: {reason}")
+    }
+}
+
+fn realtime_mic_start_error(err: &str) -> String {
+    if is_zh_locale() {
+        format!("启动麦克风采集失败：{err}")
+    } else {
+        format!("Failed to start microphone capture: {err}")
+    }
+}
+
+fn realtime_speaker_start_error(err: &str) -> String {
+    if is_zh_locale() {
+        format!("启动扬声器输出失败：{err}")
+    } else {
+        format!("Failed to start speaker output: {err}")
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum RealtimeConversationPhase {
@@ -271,7 +322,7 @@ impl ChatWidget {
             RealtimeEvent::ConversationItemDone { .. } => {}
             RealtimeEvent::HandoffRequested(_) => {}
             RealtimeEvent::Error(message) => {
-                self.add_error_message(format!("Realtime voice error: {message}"));
+                self.add_error_message(realtime_voice_error(&message));
                 self.reset_realtime_conversation_state();
             }
         }
@@ -282,7 +333,7 @@ impl ChatWidget {
         let reason = ev.reason;
         self.reset_realtime_conversation_state();
         if !requested && let Some(reason) = reason {
-            self.add_info_message(format!("Realtime voice mode closed: {reason}"), None);
+            self.add_info_message(realtime_voice_closed(&reason), None);
         }
         self.request_redraw();
     }
@@ -324,7 +375,7 @@ impl ChatWidget {
             Err(err) => {
                 self.remove_transcription_placeholder(&placeholder_id);
                 self.realtime_conversation.meter_placeholder_id = None;
-                self.add_error_message(format!("Failed to start microphone capture: {err}"));
+                self.add_error_message(realtime_mic_start_error(&err.to_string()));
                 return;
             }
         };
@@ -381,7 +432,7 @@ impl ChatWidget {
                         self.realtime_conversation.audio_player = Some(player);
                     }
                     Err(err) => {
-                        self.add_error_message(format!("Failed to start speaker output: {err}"));
+                        self.add_error_message(realtime_speaker_start_error(&err.to_string()));
                     }
                 }
             }

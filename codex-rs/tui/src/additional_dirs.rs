@@ -1,4 +1,5 @@
 use codex_protocol::protocol::SandboxPolicy;
+use std::env;
 use std::path::PathBuf;
 
 /// Returns a warning describing why `--add-dir` entries will be ignored for the
@@ -26,9 +27,33 @@ fn format_warning(additional_dirs: &[PathBuf]) -> String {
         .map(|path| path.to_string_lossy())
         .collect::<Vec<_>>()
         .join(", ");
-    format!(
-        "Ignoring --add-dir ({joined_paths}) because the effective sandbox mode is read-only. Switch to workspace-write or danger-full-access to allow additional writable roots."
-    )
+    if is_zh_locale() {
+        format!(
+            "已忽略 --add-dir（{joined_paths}），因为当前沙箱模式为只读。请切换到 workspace-write 或 danger-full-access 以允许额外可写目录。"
+        )
+    } else {
+        format!(
+            "Ignoring --add-dir ({joined_paths}) because the effective sandbox mode is read-only. Switch to workspace-write or danger-full-access to allow additional writable roots."
+        )
+    }
+}
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
 }
 
 #[cfg(test)]
