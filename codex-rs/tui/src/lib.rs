@@ -48,6 +48,7 @@ use codex_utils_oss::get_default_model_for_oss_provider;
 use cwd_prompt::CwdPromptAction;
 use cwd_prompt::CwdPromptOutcome;
 use cwd_prompt::CwdSelection;
+use std::env;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
@@ -119,6 +120,88 @@ pub mod update_action;
 mod update_prompt;
 mod updates;
 mod version;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn err_parsing_overrides(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("解析 -c 覆盖参数失败：{err}")
+    } else {
+        format!("Error parsing -c overrides: {err}")
+    }
+}
+
+fn err_finding_codex_home(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("查找 codex home 失败：{err}")
+    } else {
+        format!("Error finding codex home: {err}")
+    }
+}
+
+fn err_loading_config_toml(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("加载 config.toml 失败：{err}")
+    } else {
+        format!("Error loading config.toml: {err}")
+    }
+}
+
+fn err_loading_config_toml_with_source(source: &str) -> String {
+    if is_zh_locale() {
+        format!("加载 config.toml 失败：\n{source}")
+    } else {
+        format!("Error loading config.toml:\n{source}")
+    }
+}
+
+fn err_loading_rules(source: &str) -> String {
+    if is_zh_locale() {
+        format!("加载规则失败：\n{source}")
+    } else {
+        format!("Error loading rules:\n{source}")
+    }
+}
+
+fn err_adding_dirs(warning: &str) -> String {
+    if is_zh_locale() {
+        format!("添加目录失败：{warning}")
+    } else {
+        format!("Error adding directories: {warning}")
+    }
+}
+
+fn err_loading_configuration(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("加载配置失败：{err}")
+    } else {
+        format!("Error loading configuration: {err}")
+    }
+}
+
+fn err_restore_terminal(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("恢复终端失败。请执行 `reset` 或重启终端以恢复：{err}")
+    } else {
+        format!("failed to restore terminal. Run `reset` or restart your terminal to recover: {err}")
+    }
+}
 #[cfg(all(not(target_os = "linux"), feature = "voice-input"))]
 mod voice;
 #[cfg(all(not(target_os = "linux"), not(feature = "voice-input")))]
@@ -262,7 +345,7 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
         Ok(v) => v,
         #[allow(clippy::print_stderr)]
         Err(e) => {
-            eprintln!("Error parsing -c overrides: {e}");
+            eprintln!("{}", err_parsing_overrides(&e));
             std::process::exit(1);
         }
     };
@@ -272,7 +355,7 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
     let codex_home = match find_codex_home() {
         Ok(codex_home) => codex_home.to_path_buf(),
         Err(err) => {
-            eprintln!("Error finding codex home: {err}");
+            eprintln!("{}", err_finding_codex_home(&err));
             std::process::exit(1);
         }
     };
@@ -299,11 +382,13 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
                 .map(ConfigLoadError::config_error);
             if let Some(config_error) = config_error {
                 eprintln!(
-                    "Error loading config.toml:\n{}",
-                    format_config_error_with_source(config_error)
+                    "{}",
+                    err_loading_config_toml_with_source(
+                        &format_config_error_with_source(config_error)
+                    )
                 );
             } else {
-                eprintln!("Error loading config.toml: {err}");
+                eprintln!("{}", err_loading_config_toml(&err));
             }
             std::process::exit(1);
         }
@@ -395,8 +480,8 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
         Ok(None) => {}
         Ok(Some(err)) | Err(err) => {
             eprintln!(
-                "Error loading rules:\n{}",
-                format_exec_policy_error_with_source(&err)
+                "{}",
+                err_loading_rules(&format_exec_policy_error_with_source(&err))
             );
             std::process::exit(1);
         }
@@ -409,7 +494,7 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
     {
         #[allow(clippy::print_stderr)]
         {
-            eprintln!("Error adding directories: {warning}");
+            eprintln!("{}", err_adding_dirs(&warning));
             std::process::exit(1);
         }
     }
@@ -1055,9 +1140,7 @@ pub(crate) async fn resolve_cwd_for_resume_or_fork(
 )]
 fn restore() {
     if let Err(err) = tui::restore() {
-        eprintln!(
-            "failed to restore terminal. Run `reset` or restart your terminal to recover: {err}"
-        );
+        eprintln!("{}", err_restore_terminal(&err));
     }
 }
 
@@ -1142,7 +1225,7 @@ async fn load_config_or_exit_with_fallback_cwd(
     {
         Ok(config) => config,
         Err(err) => {
-            eprintln!("Error loading configuration: {err}");
+            eprintln!("{}", err_loading_configuration(&err));
             std::process::exit(1);
         }
     }

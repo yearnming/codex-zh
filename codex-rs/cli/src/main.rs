@@ -602,6 +602,43 @@ fn print_zh_help() {
     );
 }
 
+fn help_subcommand(args: &[String]) -> Option<String> {
+    let mut has_help = false;
+    let mut subcommand: Option<String> = None;
+    for (idx, arg) in args.iter().enumerate() {
+        if idx == 0 {
+            continue;
+        }
+        if arg == "-h" || arg == "--help" {
+            has_help = true;
+            continue;
+        }
+        if arg.starts_with('-') {
+            continue;
+        }
+        subcommand = Some(arg.clone());
+        break;
+    }
+    if has_help {
+        subcommand
+    } else {
+        None
+    }
+}
+
+fn print_zh_help_for_subcommand(subcommand: &str) -> bool {
+    let path = match subcommand {
+        "login" => "/../../docs/zh/CLI-帮助-login.md",
+        "exec" => "/../../docs/zh/CLI-帮助-exec.md",
+        "review" => "/../../docs/zh/CLI-帮助-review.md",
+        "mcp" => "/../../docs/zh/CLI-帮助-mcp.md",
+        "sandbox" => "/../../docs/zh/CLI-帮助-sandbox.md",
+        _ => return false,
+    };
+    println!("{}", include_str!(concat!(env!("CARGO_MANIFEST_DIR"), path)));
+    true
+}
+
 fn main() -> anyhow::Result<()> {
     arg0_dispatch_or_else(|arg0_paths: Arg0DispatchPaths| async move {
         cli_main(arg0_paths).await?;
@@ -614,6 +651,11 @@ async fn cli_main(arg0_paths: Arg0DispatchPaths) -> anyhow::Result<()> {
     if should_print_zh_help(&args) {
         print_zh_help();
         return Ok(());
+    }
+    if let Some(subcommand) = help_subcommand(&args) {
+        if is_zh_locale() && print_zh_help_for_subcommand(&subcommand) {
+            return Ok(());
+        }
     }
 
     let MultitoolCli {

@@ -21,3 +21,4 @@
 - `CODEX_LOCALE=zh-CN`
 - 或设置系统语言为中文（`LANG/LC_ALL/LC_MESSAGES` 含 `zh`）
 启用后执行 `codex --help` 会显示中文帮助摘要（子命令帮助仍为英文）。
+已提供部分子命令中文摘要：`login`、`exec`、`review`、`mcp`、`sandbox`。
