@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "locale": "zh-CN",
+    "last_sync": "2026-03-10",
+    "source": "openai/codex",
+    "notes": "初始占位翻译，优先覆盖入口层错误提示。"
+  },
+  "strings": {
+    "codex_cli.error.unsupported_platform": "不支持的平台：{platform}（{arch}）",
+    "codex_cli.error.unsupported_target_triple": "不支持的目标三元组：{targetTriple}",
+    "codex_cli.error.missing_optional_dependency": "缺少可选依赖 {platformPackage}。请重新安装 Codex：{updateCommand}"
+  }
+}
