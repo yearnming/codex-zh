@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 
 use codex_core::config::set_project_trust_level;
@@ -32,6 +33,32 @@ pub(crate) struct TrustDirectoryWidget {
     pub selection: Option<TrustDirectorySelection>,
     pub highlighted: TrustDirectorySelection,
     pub error: Option<String>,
+}
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn trust_set_error(target: &PathBuf, err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("设置信任目录失败：{}，错误：{err}", target.display())
+    } else {
+        format!("Failed to set trust for {}: {err}", target.display())
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,7 +169,7 @@ impl TrustDirectoryWidget {
             resolve_root_git_project_for_trust(&self.cwd).unwrap_or_else(|| self.cwd.clone());
         if let Err(e) = set_project_trust_level(&self.codex_home, &target, TrustLevel::Trusted) {
             tracing::error!("Failed to set project trusted: {e:?}");
-            self.error = Some(format!("Failed to set trust for {}: {e}", target.display()));
+            self.error = Some(trust_set_error(&target, &e));
         }
 
         self.selection = Some(TrustDirectorySelection::Trust);
