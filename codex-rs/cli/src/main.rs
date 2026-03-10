@@ -633,6 +633,12 @@ fn print_zh_help_for_subcommand(subcommand: &str) -> bool {
         "review" => "/../../docs/zh/CLI-帮助-review.md",
         "mcp" => "/../../docs/zh/CLI-帮助-mcp.md",
         "sandbox" => "/../../docs/zh/CLI-帮助-sandbox.md",
+        "resume" => "/../../docs/zh/CLI-帮助-resume.md",
+        "fork" => "/../../docs/zh/CLI-帮助-fork.md",
+        "completion" => "/../../docs/zh/CLI-帮助-completion.md",
+        "apply" => "/../../docs/zh/CLI-帮助-apply.md",
+        "cloud" => "/../../docs/zh/CLI-帮助-cloud.md",
+        "debug" => "/../../docs/zh/CLI-帮助-debug.md",
         _ => return false,
     };
     println!("{}", include_str!(concat!(env!("CARGO_MANIFEST_DIR"), path)));

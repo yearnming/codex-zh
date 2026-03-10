@@ -4,10 +4,16 @@ filegroup(
     name = "cli_help_zh",
     srcs = [
         "CLI-帮助.md",
+        "CLI-帮助-apply.md",
+        "CLI-帮助-cloud.md",
+        "CLI-帮助-completion.md",
         "CLI-帮助-exec.md",
+        "CLI-帮助-fork.md",
         "CLI-帮助-login.md",
         "CLI-帮助-mcp.md",
+        "CLI-帮助-resume.md",
         "CLI-帮助-review.md",
         "CLI-帮助-sandbox.md",
+        "CLI-帮助-debug.md",
     ],
 )

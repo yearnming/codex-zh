@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,6 +40,32 @@ use unicode_width::UnicodeWidthStr;
 
 const PAGE_SIZE: usize = 25;
 const LOAD_NEAR_THRESHOLD: usize = 5;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn resume_metadata_error(path: &Path) -> String {
+    if is_zh_locale() {
+        format!("读取会话元数据失败：{}", path.display())
+    } else {
+        format!("Failed to read session metadata from {}", path.display())
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SessionTarget {
@@ -421,10 +448,7 @@ impl PickerState {
                     if let Some(thread_id) = thread_id {
                         return Ok(Some(self.action.selection(path, thread_id)));
                     }
-                    self.inline_error = Some(format!(
-                        "Failed to read session metadata from {}",
-                        path.display()
-                    ));
+                    self.inline_error = Some(resume_metadata_error(path.as_path()));
                     self.request_frame();
                 }
             }
