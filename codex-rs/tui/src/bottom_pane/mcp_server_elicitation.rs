@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::env;
 use std::path::PathBuf;
 
 use codex_app_server_protocol::McpElicitationEnumSchema;
@@ -24,6 +25,36 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(label_en: &str, label_zh: &str) -> String {
+    if is_zh_locale() {
+        label_zh.to_string()
+    } else {
+        label_en.to_string()
+    }
+}
+
+fn t_opt(label_en: &str, label_zh: &str) -> Option<String> {
+    Some(t(label_en, label_zh))
+}
 
 use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
@@ -190,8 +221,8 @@ impl McpServerElicitationFormRequest {
             || (is_tool_approval && is_empty_object_schema)
         {
             let mut options = vec![McpServerElicitationOption {
-                label: "Approve Once".to_string(),
-                description: Some("Run the tool and continue.".to_string()),
+                label: t("Approve Once", "仅本次允许"),
+                description: t_opt("Run the tool and continue.", "运行该工具并继续。"),
                 value: Value::String(APPROVAL_ACCEPT_ONCE_VALUE.to_string()),
             }];
             if is_tool_approval_action
@@ -201,9 +232,10 @@ impl McpServerElicitationFormRequest {
                 )
             {
                 options.push(McpServerElicitationOption {
-                    label: "Approve this session".to_string(),
-                    description: Some(
-                        "Run the tool and remember this choice for this session.".to_string(),
+                    label: t("Approve this session", "仅本会话允许"),
+                    description: t_opt(
+                        "Run the tool and remember this choice for this session.",
+                        "运行该工具，并在本会话中记住此选择。",
                     ),
                     value: Value::String(APPROVAL_ACCEPT_SESSION_VALUE.to_string()),
                 });
@@ -212,29 +244,33 @@ impl McpServerElicitationFormRequest {
                 && tool_approval_supports_persist_mode(meta.as_ref(), APPROVAL_PERSIST_ALWAYS_VALUE)
             {
                 options.push(McpServerElicitationOption {
-                    label: "Always allow".to_string(),
-                    description: Some(
-                        "Run the tool and remember this choice for future tool calls.".to_string(),
+                    label: t("Always allow", "始终允许"),
+                    description: t_opt(
+                        "Run the tool and remember this choice for future tool calls.",
+                        "运行该工具，并在未来的调用中记住此选择。",
                     ),
                     value: Value::String(APPROVAL_ACCEPT_ALWAYS_VALUE.to_string()),
                 });
             }
             if is_tool_approval_action {
                 options.push(McpServerElicitationOption {
-                    label: "Cancel".to_string(),
-                    description: Some("Cancel this tool call".to_string()),
+                    label: t("Cancel", "取消"),
+                    description: t_opt("Cancel this tool call", "取消本次工具调用"),
                     value: Value::String(APPROVAL_CANCEL_VALUE.to_string()),
                 });
             } else {
                 options.extend([
                     McpServerElicitationOption {
-                        label: "Deny".to_string(),
-                        description: Some("Decline this tool call and continue.".to_string()),
+                        label: t("Deny", "拒绝"),
+                        description: t_opt(
+                            "Decline this tool call and continue.",
+                            "拒绝该工具调用并继续。",
+                        ),
                         value: Value::String(APPROVAL_DECLINE_VALUE.to_string()),
                     },
                     McpServerElicitationOption {
-                        label: "Cancel".to_string(),
-                        description: Some("Cancel this tool call".to_string()),
+                        label: t("Cancel", "取消"),
+                        description: t_opt("Cancel this tool call", "取消本次工具调用"),
                         value: Value::String(APPROVAL_CANCEL_VALUE.to_string()),
                     },
                 ]);
@@ -339,7 +375,11 @@ fn parse_field(
             let options = [true, false]
                 .into_iter()
                 .map(|value| {
-                    let label = if value { "True" } else { "False" }.to_string();
+                    let label = if value {
+                        t("True", "是")
+                    } else {
+                        t("False", "否")
+                    };
                     McpServerElicitationOption {
                         label,
                         description: None,
@@ -1498,28 +1538,48 @@ mod tests {
         snapshot_buffer(&buf)
     }
 
+    fn with_locale<T>(locale: &str, f: impl FnOnce() -> T) -> T {
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, locale);
+        }
+        let out = f();
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
+        out
+    }
+
     #[test]
     fn parses_boolean_form_request() {
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                            "description": "Approve the pending action.",
-                        }
-                    },
-                    "required": ["confirmed"],
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                                "description": "Approve the pending action.",
+                            }
+                        },
+                        "required": ["confirmed"],
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
 
         assert_eq!(
             request,
@@ -1579,11 +1639,13 @@ mod tests {
     #[test]
     fn missing_schema_uses_approval_actions() {
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request("Allow this request?", Value::Null, None),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request("Allow this request?", Value::Null, None),
+            )
+            .expect("expected approval fallback")
+        });
 
         assert_eq!(
             request,
@@ -1628,15 +1690,17 @@ mod tests {
     #[test]
     fn empty_tool_approval_schema_uses_approval_actions() {
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                empty_object_schema(),
-                tool_approval_meta(&[]),
-            ),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    empty_object_schema(),
+                    tool_approval_meta(&[]),
+                ),
+            )
+            .expect("expected approval fallback")
+        });
 
         assert_eq!(
             request,
@@ -1685,25 +1749,27 @@ mod tests {
     fn submit_sends_accept_with_typed_content() {
         let (tx, mut rx) = test_sender();
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                            "description": "Approve the pending action.",
-                        }
-                    },
-                    "required": ["confirmed"],
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                                "description": "Approve the pending action.",
+                            }
+                        },
+                        "required": ["confirmed"],
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
         let mut overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         overlay.select_current_option(true);
@@ -1736,18 +1802,20 @@ mod tests {
     fn empty_tool_approval_schema_session_choice_sets_persist_meta() {
         let (tx, mut rx) = test_sender();
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                empty_object_schema(),
-                tool_approval_meta(&[
-                    APPROVAL_PERSIST_SESSION_VALUE,
-                    APPROVAL_PERSIST_ALWAYS_VALUE,
-                ]),
-            ),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    empty_object_schema(),
+                    tool_approval_meta(&[
+                        APPROVAL_PERSIST_SESSION_VALUE,
+                        APPROVAL_PERSIST_ALWAYS_VALUE,
+                    ]),
+                ),
+            )
+            .expect("expected approval fallback")
+        });
         let mut overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         if let Some(answer) = overlay.current_answer_mut() {
@@ -1783,18 +1851,20 @@ mod tests {
     fn empty_tool_approval_schema_always_allow_sets_persist_meta() {
         let (tx, mut rx) = test_sender();
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                empty_object_schema(),
-                tool_approval_meta(&[
-                    APPROVAL_PERSIST_SESSION_VALUE,
-                    APPROVAL_PERSIST_ALWAYS_VALUE,
-                ]),
-            ),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    empty_object_schema(),
+                    tool_approval_meta(&[
+                        APPROVAL_PERSIST_SESSION_VALUE,
+                        APPROVAL_PERSIST_ALWAYS_VALUE,
+                    ]),
+                ),
+            )
+            .expect("expected approval fallback")
+        });
         let mut overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         if let Some(answer) = overlay.current_answer_mut() {
@@ -1830,25 +1900,27 @@ mod tests {
     fn ctrl_c_cancels_elicitation() {
         let (tx, mut rx) = test_sender();
         let thread_id = ThreadId::default();
-        let request = McpServerElicitationFormRequest::from_event(
-            thread_id,
-            form_request(
-                "Allow this request?",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                            "description": "Approve the pending action.",
-                        }
-                    },
-                    "required": ["confirmed"],
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                thread_id,
+                form_request(
+                    "Allow this request?",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                                "description": "Approve the pending action.",
+                            }
+                        },
+                        "required": ["confirmed"],
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
         let mut overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         assert_eq!(overlay.on_ctrl_c(), CancellationEvent::Handled);
@@ -1877,57 +1949,63 @@ mod tests {
     #[test]
     fn queues_requests_fifo() {
         let (tx, _rx) = test_sender();
-        let first = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "First",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                        }
-                    },
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
-        let second = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "Second",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                        }
-                    },
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
-        let third = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "Third",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                        }
-                    },
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
+        let first = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "First",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                            }
+                        },
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
+        let second = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "Second",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                            }
+                        },
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
+        let third = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "Third",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                            }
+                        },
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
         let mut overlay = McpServerElicitationOverlay::new(first, tx, true, false, false);
 
         overlay.try_consume_mcp_server_elicitation_request(second);
@@ -1946,25 +2024,27 @@ mod tests {
     #[test]
     fn boolean_form_snapshot() {
         let (tx, _rx) = test_sender();
-        let request = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "Allow this request?",
-                serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "confirmed": {
-                            "type": "boolean",
-                            "title": "Confirm",
-                            "description": "Approve the pending action.",
-                        }
-                    },
-                    "required": ["confirmed"],
-                }),
-                None,
-            ),
-        )
-        .expect("expected supported form");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "Allow this request?",
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {
+                            "confirmed": {
+                                "type": "boolean",
+                                "title": "Confirm",
+                                "description": "Approve the pending action.",
+                            }
+                        },
+                        "required": ["confirmed"],
+                    }),
+                    None,
+                ),
+            )
+            .expect("expected supported form")
+        });
         let overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         insta::assert_snapshot!(
@@ -1976,15 +2056,17 @@ mod tests {
     #[test]
     fn approval_form_tool_approval_snapshot() {
         let (tx, _rx) = test_sender();
-        let request = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "Allow this request?",
-                empty_object_schema(),
-                tool_approval_meta(&[]),
-            ),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "Allow this request?",
+                    empty_object_schema(),
+                    tool_approval_meta(&[]),
+                ),
+            )
+            .expect("expected approval fallback")
+        });
         let overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         insta::assert_snapshot!(
@@ -1996,18 +2078,20 @@ mod tests {
     #[test]
     fn approval_form_tool_approval_with_persist_options_snapshot() {
         let (tx, _rx) = test_sender();
-        let request = McpServerElicitationFormRequest::from_event(
-            ThreadId::default(),
-            form_request(
-                "Allow this request?",
-                empty_object_schema(),
-                tool_approval_meta(&[
-                    APPROVAL_PERSIST_SESSION_VALUE,
-                    APPROVAL_PERSIST_ALWAYS_VALUE,
-                ]),
-            ),
-        )
-        .expect("expected approval fallback");
+        let request = with_locale("en-US", || {
+            McpServerElicitationFormRequest::from_event(
+                ThreadId::default(),
+                form_request(
+                    "Allow this request?",
+                    empty_object_schema(),
+                    tool_approval_meta(&[
+                        APPROVAL_PERSIST_SESSION_VALUE,
+                        APPROVAL_PERSIST_ALWAYS_VALUE,
+                    ]),
+                ),
+            )
+            .expect("expected approval fallback")
+        });
         let overlay = McpServerElicitationOverlay::new(request, tx, true, false, false);
 
         insta::assert_snapshot!(

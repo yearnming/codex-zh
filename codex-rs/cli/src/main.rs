@@ -619,19 +619,18 @@ fn help_subcommand(args: &[String]) -> Option<String> {
         subcommand = Some(arg.clone());
         break;
     }
-    if has_help {
-        subcommand
-    } else {
-        None
-    }
+    if has_help { subcommand } else { None }
 }
 
 fn print_zh_help_for_subcommand(subcommand: &str) -> bool {
     let path = match subcommand {
         "login" => "/../../docs/zh/CLI-帮助-login.md",
+        "logout" => "/../../docs/zh/CLI-帮助-logout.md",
         "exec" => "/../../docs/zh/CLI-帮助-exec.md",
         "review" => "/../../docs/zh/CLI-帮助-review.md",
         "mcp" => "/../../docs/zh/CLI-帮助-mcp.md",
+        "mcp-server" => "/../../docs/zh/CLI-帮助-mcp-server.md",
+        "app-server" => "/../../docs/zh/CLI-帮助-app-server.md",
         "sandbox" => "/../../docs/zh/CLI-帮助-sandbox.md",
         "resume" => "/../../docs/zh/CLI-帮助-resume.md",
         "fork" => "/../../docs/zh/CLI-帮助-fork.md",
@@ -639,9 +638,13 @@ fn print_zh_help_for_subcommand(subcommand: &str) -> bool {
         "apply" => "/../../docs/zh/CLI-帮助-apply.md",
         "cloud" => "/../../docs/zh/CLI-帮助-cloud.md",
         "debug" => "/../../docs/zh/CLI-帮助-debug.md",
+        "features" => "/../../docs/zh/CLI-帮助-features.md",
         _ => return false,
     };
-    println!("{}", include_str!(concat!(env!("CARGO_MANIFEST_DIR"), path)));
+    println!(
+        "{}",
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), path))
+    );
     true
 }
 

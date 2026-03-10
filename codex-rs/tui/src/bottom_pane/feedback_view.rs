@@ -163,8 +163,13 @@ impl FeedbackNoteView {
                 )));
             }
             Err(e) => {
+                let message = if crate::is_zh_locale() {
+                    format!("上传反馈失败：{e}")
+                } else {
+                    format!("Failed to upload feedback: {e}")
+                };
                 self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
-                    history_cell::new_error_event(format!("Failed to upload feedback: {e}")),
+                    history_cell::new_error_event(message),
                 )));
             }
         }

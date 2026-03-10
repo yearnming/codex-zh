@@ -21,12 +21,25 @@ pub enum PromptArgsError {
 
 impl PromptArgsError {
     fn describe(&self, command: &str) -> String {
+        let is_zh = crate::is_zh_locale();
         match self {
-            PromptArgsError::MissingAssignment { token } => format!(
-                "Could not parse {command}: expected key=value but found '{token}'. Wrap values in double quotes if they contain spaces."
-            ),
+            PromptArgsError::MissingAssignment { token } => {
+                if is_zh {
+                    format!(
+                        "无法解析 {command}：需要 key=value，但得到 '{token}'。如果值包含空格，请用双引号包裹。"
+                    )
+                } else {
+                    format!(
+                        "Could not parse {command}: expected key=value but found '{token}'. Wrap values in double quotes if they contain spaces."
+                    )
+                }
+            }
             PromptArgsError::MissingKey { token } => {
-                format!("Could not parse {command}: expected a name before '=' in '{token}'.")
+                if is_zh {
+                    format!("无法解析 {command}：在 '{token}' 中 '=' 前缺少名称。")
+                } else {
+                    format!("Could not parse {command}: expected a name before '=' in '{token}'.")
+                }
             }
         }
     }
@@ -46,13 +59,20 @@ pub enum PromptExpansionError {
 
 impl PromptExpansionError {
     pub fn user_message(&self) -> String {
+        let is_zh = crate::is_zh_locale();
         match self {
             PromptExpansionError::Args { command, error } => error.describe(command),
             PromptExpansionError::MissingArgs { command, missing } => {
                 let list = missing.join(", ");
-                format!(
-                    "Missing required args for {command}: {list}. Provide as key=value (quote values with spaces)."
-                )
+                if is_zh {
+                    format!(
+                        "缺少 {command} 的必填参数：{list}。请以 key=value 形式提供（有空格请加引号）。"
+                    )
+                } else {
+                    format!(
+                        "Missing required args for {command}: {list}. Provide as key=value (quote values with spaces)."
+                    )
+                }
             }
         }
     }
@@ -564,6 +584,24 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    fn with_locale<T>(locale: &str, f: impl FnOnce() -> T) -> T {
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, locale);
+        }
+        let out = f();
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
+        out
+    }
+
     #[test]
     fn expand_arguments_basic() {
         let prompts = vec![CustomPrompt {
@@ -612,33 +650,37 @@ mod tests {
 
     #[test]
     fn invalid_arg_token_reports_error() {
-        let prompts = vec![CustomPrompt {
-            name: "my-prompt".to_string(),
-            path: "/tmp/my-prompt.md".to_string().into(),
-            content: "Review $USER changes".to_string(),
-            description: None,
-            argument_hint: None,
-        }];
-        let err = expand_custom_prompt("/prompts:my-prompt USER=Alice stray", &[], &prompts)
-            .unwrap_err()
-            .user_message();
-        assert!(err.contains("expected key=value"));
+        with_locale("en-US", || {
+            let prompts = vec![CustomPrompt {
+                name: "my-prompt".to_string(),
+                path: "/tmp/my-prompt.md".to_string().into(),
+                content: "Review $USER changes".to_string(),
+                description: None,
+                argument_hint: None,
+            }];
+            let err = expand_custom_prompt("/prompts:my-prompt USER=Alice stray", &[], &prompts)
+                .unwrap_err()
+                .user_message();
+            assert!(err.contains("expected key=value"));
+        });
     }
 
     #[test]
     fn missing_required_args_reports_error() {
-        let prompts = vec![CustomPrompt {
-            name: "my-prompt".to_string(),
-            path: "/tmp/my-prompt.md".to_string().into(),
-            content: "Review $USER changes on $BRANCH".to_string(),
-            description: None,
-            argument_hint: None,
-        }];
-        let err = expand_custom_prompt("/prompts:my-prompt USER=Alice", &[], &prompts)
-            .unwrap_err()
-            .user_message();
-        assert!(err.to_lowercase().contains("missing required args"));
-        assert!(err.contains("BRANCH"));
+        with_locale("en-US", || {
+            let prompts = vec![CustomPrompt {
+                name: "my-prompt".to_string(),
+                path: "/tmp/my-prompt.md".to_string().into(),
+                content: "Review $USER changes on $BRANCH".to_string(),
+                description: None,
+                argument_hint: None,
+            }];
+            let err = expand_custom_prompt("/prompts:my-prompt USER=Alice", &[], &prompts)
+                .unwrap_err()
+                .user_message();
+            assert!(err.to_lowercase().contains("missing required args"));
+            assert!(err.contains("BRANCH"));
+        });
     }
 
     #[test]

@@ -3,6 +3,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use std::env;
 
 use crate::render::renderable::Renderable;
 use crate::wrapping::RtOptions;
@@ -11,6 +12,45 @@ use crate::wrapping::adaptive_wrap_lines;
 /// Widget that lists inactive threads with outstanding approval requests.
 pub(crate) struct PendingThreadApprovals {
     threads: Vec<String>,
+}
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn approval_needed_line(thread: &str) -> String {
+    if is_zh_locale() {
+        format!("需要审批：{thread}")
+    } else {
+        format!("Approval needed in {thread}")
+    }
+}
+
+fn switch_thread_hint() -> Line<'static> {
+    Line::from(vec![
+        "    ".into(),
+        "/agent".cyan().bold(),
+        if is_zh_locale() {
+            " 切换会话".dim()
+        } else {
+            " to switch threads".dim()
+        },
+    ])
+    .dim()
 }
 
 impl PendingThreadApprovals {
@@ -45,7 +85,7 @@ impl PendingThreadApprovals {
         let mut lines = Vec::new();
         for thread in self.threads.iter().take(3) {
             let wrapped = adaptive_wrap_lines(
-                std::iter::once(Line::from(format!("Approval needed in {thread}"))),
+                std::iter::once(Line::from(approval_needed_line(thread))),
                 RtOptions::new(width as usize)
                     .initial_indent(Line::from(vec!["  ".into(), "!".red().bold(), " ".into()]))
                     .subsequent_indent(Line::from("    ")),
@@ -57,14 +97,7 @@ impl PendingThreadApprovals {
             lines.push(Line::from("    ...".dim().italic()));
         }
 
-        lines.push(
-            Line::from(vec![
-                "    ".into(),
-                "/agent".cyan().bold(),
-                " to switch threads".dim(),
-            ])
-            .dim(),
-        );
+        lines.push(switch_thread_hint());
 
         Paragraph::new(lines).into()
     }
@@ -105,6 +138,24 @@ mod tests {
             .join("\n")
     }
 
+    fn with_locale<T>(locale: &str, f: impl FnOnce() -> T) -> T {
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, locale);
+        }
+        let out = f();
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
+        out
+    }
+
     #[test]
     fn desired_height_empty() {
         let widget = PendingThreadApprovals::new();
@@ -117,7 +168,7 @@ mod tests {
         widget.set_threads(vec!["Robie [explorer]".to_string()]);
 
         assert_snapshot!(
-            snapshot_rows(&widget, 40).replace(' ', "."),
+            with_locale("en-US", || snapshot_rows(&widget, 40)).replace(' ', "."),
             @r"
 ..!.Approval.needed.in.Robie.[explorer].
 ..../agent.to.switch.threads............"
@@ -135,7 +186,7 @@ mod tests {
         ]);
 
         assert_snapshot!(
-            snapshot_rows(&widget, 44).replace(' ', "."),
+            with_locale("en-US", || snapshot_rows(&widget, 44)).replace(' ', "."),
             @r"
 ..!.Approval.needed.in.Main.[default].......
 ..!.Approval.needed.in.Robie.[explorer].....

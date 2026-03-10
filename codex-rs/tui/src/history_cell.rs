@@ -73,6 +73,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
 use std::any::Any;
 use std::collections::HashMap;
+use std::env;
 use std::io::Cursor;
 use std::path::Path;
 use std::path::PathBuf;
@@ -785,11 +786,137 @@ fn exec_snippet(command: &[String]) -> String {
     truncate_exec_snippet(&full_cmd)
 }
 
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn approval_history_summary(
+    decision: &codex_protocol::protocol::ReviewDecision,
+    snippet: Span<'static>,
+    host: Option<String>,
+) -> Vec<Span<'static>> {
+    use codex_protocol::protocol::NetworkPolicyRuleAction;
+    use codex_protocol::protocol::ReviewDecision::*;
+    let zh = is_zh_locale();
+    match decision {
+        Approved => vec![
+            if zh { "你已" } else { "You " }.into(),
+            if zh { "批准" } else { "approved" }.bold(),
+            if zh {
+                " Codex 运行 "
+            } else {
+                " codex to run "
+            }
+            .into(),
+            snippet,
+            if zh { "（本次）" } else { " this time" }.bold(),
+        ],
+        ApprovedExecpolicyAmendment { .. } => vec![
+            if zh { "你已" } else { "You " }.into(),
+            if zh { "批准" } else { "approved" }.bold(),
+            if zh {
+                " Codex 始终运行以以下内容开头的命令："
+            } else {
+                " codex to always run commands that start with "
+            }
+            .into(),
+            snippet,
+        ],
+        ApprovedForSession => vec![
+            if zh { "你已" } else { "You " }.into(),
+            if zh { "批准" } else { "approved" }.bold(),
+            if zh {
+                " Codex 运行 "
+            } else {
+                " codex to run "
+            }
+            .into(),
+            snippet,
+            if zh {
+                "（本会话）"
+            } else {
+                " every time this session"
+            }
+            .bold(),
+        ],
+        NetworkPolicyAmendment {
+            network_policy_amendment,
+        } => {
+            let host = host.unwrap_or_default();
+            match network_policy_amendment.action {
+                NetworkPolicyRuleAction::Allow => vec![
+                    if zh { "你已" } else { "You " }.into(),
+                    if zh { "永久允许" } else { "persisted" }.bold(),
+                    if zh {
+                        " Codex 访问网络： "
+                    } else {
+                        " Codex network access to "
+                    }
+                    .into(),
+                    Span::from(host).dim(),
+                ],
+                NetworkPolicyRuleAction::Deny => vec![
+                    if zh { "你已" } else { "You " }.into(),
+                    if zh { "拒绝" } else { "denied" }.bold(),
+                    if zh {
+                        " Codex 访问网络： "
+                    } else {
+                        " codex network access to "
+                    }
+                    .into(),
+                    Span::from(host).dim(),
+                    if zh {
+                        "，并保存规则"
+                    } else {
+                        " and saved that rule"
+                    }
+                    .into(),
+                ],
+            }
+        }
+        Denied => vec![
+            if zh { "你已" } else { "You " }.into(),
+            if zh { "未批准" } else { "did not approve" }.bold(),
+            if zh {
+                " Codex 运行 "
+            } else {
+                " codex to run "
+            }
+            .into(),
+            snippet,
+        ],
+        Abort => vec![
+            if zh { "你已" } else { "You " }.into(),
+            if zh { "取消" } else { "canceled" }.bold(),
+            if zh {
+                "执行请求： "
+            } else {
+                " the request to run "
+            }
+            .into(),
+            snippet,
+        ],
+    }
+}
+
 pub fn new_approval_decision_cell(
     command: Vec<String>,
     decision: codex_protocol::protocol::ReviewDecision,
 ) -> Box<dyn HistoryCell> {
-    use codex_protocol::protocol::NetworkPolicyRuleAction;
     use codex_protocol::protocol::ReviewDecision::*;
 
     let (symbol, summary): (Span<'static>, Vec<Span<'static>>) = match decision {
@@ -797,13 +924,7 @@ pub fn new_approval_decision_cell(
             let snippet = Span::from(exec_snippet(&command)).dim();
             (
                 "✔ ".green(),
-                vec![
-                    "You ".into(),
-                    "approved".bold(),
-                    " codex to run ".into(),
-                    snippet,
-                    " this time".bold(),
-                ],
+                approval_history_summary(&Approved, snippet, None),
             )
         }
         ApprovedExecpolicyAmendment {
@@ -812,73 +933,48 @@ pub fn new_approval_decision_cell(
             let snippet = Span::from(exec_snippet(&proposed_execpolicy_amendment.command)).dim();
             (
                 "✔ ".green(),
-                vec![
-                    "You ".into(),
-                    "approved".bold(),
-                    " codex to always run commands that start with ".into(),
+                approval_history_summary(
+                    &ApprovedExecpolicyAmendment {
+                        proposed_execpolicy_amendment,
+                    },
                     snippet,
-                ],
+                    None,
+                ),
             )
         }
         ApprovedForSession => {
             let snippet = Span::from(exec_snippet(&command)).dim();
             (
                 "✔ ".green(),
-                vec![
-                    "You ".into(),
-                    "approved".bold(),
-                    " codex to run ".into(),
-                    snippet,
-                    " every time this session".bold(),
-                ],
+                approval_history_summary(&ApprovedForSession, snippet, None),
             )
         }
         NetworkPolicyAmendment {
             network_policy_amendment,
-        } => match network_policy_amendment.action {
-            NetworkPolicyRuleAction::Allow => (
-                "✔ ".green(),
-                vec![
-                    "You ".into(),
-                    "persisted".bold(),
-                    " Codex network access to ".into(),
-                    Span::from(network_policy_amendment.host).dim(),
-                ],
-            ),
-            NetworkPolicyRuleAction::Deny => (
-                "✗ ".red(),
-                vec![
-                    "You ".into(),
-                    "denied".bold(),
-                    " codex network access to ".into(),
-                    Span::from(network_policy_amendment.host).dim(),
-                    " and saved that rule".into(),
-                ],
-            ),
-        },
+        } => {
+            let symbol = match network_policy_amendment.action {
+                codex_protocol::protocol::NetworkPolicyRuleAction::Allow => "✔ ".green(),
+                codex_protocol::protocol::NetworkPolicyRuleAction::Deny => "✗ ".red(),
+            };
+            let host = network_policy_amendment.host.clone();
+            (
+                symbol,
+                approval_history_summary(
+                    &NetworkPolicyAmendment {
+                        network_policy_amendment,
+                    },
+                    Span::from(String::new()),
+                    Some(host),
+                ),
+            )
+        }
         Denied => {
             let snippet = Span::from(exec_snippet(&command)).dim();
-            (
-                "✗ ".red(),
-                vec![
-                    "You ".into(),
-                    "did not approve".bold(),
-                    " codex to run ".into(),
-                    snippet,
-                ],
-            )
+            ("✗ ".red(), approval_history_summary(&Denied, snippet, None))
         }
         Abort => {
             let snippet = Span::from(exec_snippet(&command)).dim();
-            (
-                "✗ ".red(),
-                vec![
-                    "You ".into(),
-                    "canceled".bold(),
-                    " the request to run ".into(),
-                    snippet,
-                ],
-            )
+            ("✗ ".red(), approval_history_summary(&Abort, snippet, None))
         }
     };
 
@@ -1465,8 +1561,13 @@ impl HistoryCell for McpToolCallCell {
                     }
                 }
                 Err(err) => {
+                    let err_label = if crate::is_zh_locale() {
+                        format!("错误：{err}")
+                    } else {
+                        format!("Error: {err}")
+                    };
                     let err_text = format_and_truncate_tool_result(
-                        &format!("Error: {err}"),
+                        &err_label,
                         TOOL_CALL_MAX_LINES,
                         width as usize,
                     );
@@ -2180,7 +2281,12 @@ pub(crate) fn new_patch_apply_failure(stderr: String) -> PlainHistoryCell {
     let mut lines: Vec<Line<'static>> = Vec::new();
 
     // Failure title
-    lines.push(Line::from("✘ Failed to apply patch".magenta().bold()));
+    let failure_title = if crate::is_zh_locale() {
+        "✘ 应用补丁失败"
+    } else {
+        "✘ Failed to apply patch"
+    };
+    lines.push(Line::from(failure_title.magenta().bold()));
 
     if !stderr.trim().is_empty() {
         let output = output_lines(
@@ -2857,6 +2963,10 @@ mod tests {
 
     #[test]
     fn prefixed_wrapped_history_cell_indents_wrapped_lines() {
+        let prev = std::env::var("CODEX_LOCALE").ok();
+        unsafe {
+            std::env::set_var("CODEX_LOCALE", "en-US");
+        }
         let summary = Line::from(vec![
             "You ".into(),
             "approved".bold(),
@@ -2876,6 +2986,14 @@ mod tests {
                 "  time".to_string(),
             ]
         );
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var("CODEX_LOCALE", value);
+            },
+            None => unsafe {
+                std::env::remove_var("CODEX_LOCALE");
+            },
+        }
     }
 
     #[test]
@@ -3188,6 +3306,11 @@ mod tests {
 
     #[test]
     fn completed_mcp_tool_call_error_snapshot() {
+        let prev = std::env::var("CODEX_LOCALE").ok();
+        unsafe {
+            std::env::set_var("CODEX_LOCALE", "en-US");
+        }
+
         let invocation = McpInvocation {
             server: "search".into(),
             tool: "find_docs".into(),
@@ -3206,6 +3329,15 @@ mod tests {
         let rendered = render_lines(&cell.display_lines(80)).join("\n");
 
         insta::assert_snapshot!(rendered);
+
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var("CODEX_LOCALE", value);
+            },
+            None => unsafe {
+                std::env::remove_var("CODEX_LOCALE");
+            },
+        }
     }
 
     #[test]

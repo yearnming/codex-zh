@@ -93,6 +93,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -117,6 +118,68 @@ use self::pending_interactive_replay::PendingInteractiveReplayState;
 
 const EXTERNAL_EDITOR_HINT: &str = "Save and close external editor to continue.";
 const THREAD_EVENT_CHANNEL_CAPACITY: usize = 32768;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn err_carry_forward_approval(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("延续审批策略失败：{err}")
+    } else {
+        format!("Failed to carry forward approval policy override: {err}")
+    }
+}
+
+fn err_carry_forward_sandbox(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("延续沙箱策略失败：{err}")
+    } else {
+        format!("Failed to carry forward sandbox policy override: {err}")
+    }
+}
+
+fn sandbox_ready_lines() -> Vec<Line<'static>> {
+    if is_zh_locale() {
+        vec![
+            Line::from(vec!["• ".dim(), "沙箱已就绪".into()]),
+            Line::from(vec![
+                "  ".into(),
+                "Codex 现在可以安全地在本机编辑文件并执行命令".dark_gray(),
+            ]),
+        ]
+    } else {
+        vec![
+            Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
+            Line::from(vec![
+                "  ".into(),
+                "Codex can now safely edit files and execute commands in your computer".dark_gray(),
+            ]),
+        ]
+    }
+}
+
+fn err_enable_windows_sandbox(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("启用 Windows 沙箱功能失败：{err}")
+    } else {
+        format!("Failed to enable the Windows sandbox feature: {err}")
+    }
+}
 
 enum ThreadInteractiveRequest {
     Approval(ApprovalRequest),
@@ -814,17 +877,15 @@ impl App {
             && let Err(err) = config.permissions.approval_policy.set(*policy)
         {
             tracing::warn!(%err, "failed to carry forward approval policy override");
-            self.chat_widget.add_error_message(format!(
-                "Failed to carry forward approval policy override: {err}"
-            ));
+            self.chat_widget
+                .add_error_message(err_carry_forward_approval(&err));
         }
         if let Some(policy) = self.runtime_sandbox_policy_override.as_ref()
             && let Err(err) = config.permissions.sandbox_policy.set(policy.clone())
         {
             tracing::warn!(%err, "failed to carry forward sandbox policy override");
-            self.chat_widget.add_error_message(format!(
-                "Failed to carry forward sandbox policy override: {err}"
-            ));
+            self.chat_widget
+                .add_error_message(err_carry_forward_sandbox(&err));
         }
     }
 
@@ -2748,14 +2809,8 @@ impl App {
                                 self.app_event_tx
                                     .send(AppEvent::UpdateSandboxPolicy(preset.sandbox.clone()));
                                 let _ = mode;
-                                self.chat_widget.add_plain_history_lines(vec![
-                                    Line::from(vec!["• ".dim(), "Sandbox ready".into()]),
-                                    Line::from(vec![
-                                        "  ".into(),
-                                        "Codex can now safely edit files and execute commands in your computer"
-                                            .dark_gray(),
-                                    ]),
-                                ]);
+                                self.chat_widget
+                                    .add_plain_history_lines(sandbox_ready_lines());
                             }
                         }
                         Err(err) => {
@@ -2763,9 +2818,8 @@ impl App {
                                 error = %err,
                                 "failed to enable Windows sandbox feature"
                             );
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to enable the Windows sandbox feature: {err}"
-                            ));
+                            self.chat_widget
+                                .add_error_message(err_enable_windows_sandbox(&err));
                         }
                     }
                 }
@@ -3597,19 +3651,37 @@ impl App {
         let editor_cmd = match external_editor::resolve_editor_command() {
             Ok(cmd) => cmd,
             Err(external_editor::EditorError::MissingEditor) => {
-                self.chat_widget
-                    .add_to_history(history_cell::new_error_event(
+                let message = if is_zh_locale() {
+                    "无法打开外部编辑器：请在启动 Codex 前设置 $VISUAL 或 $EDITOR。".to_string()
+                } else {
                     "Cannot open external editor: set $VISUAL or $EDITOR before starting Codex."
-                        .to_string(),
-                ));
+                        .to_string()
+                };
+                self.chat_widget
+                    .add_to_history(history_cell::new_error_event(message));
                 self.reset_external_editor_state(tui);
                 return;
             }
-            Err(err) => {
+            #[cfg(not(windows))]
+            Err(external_editor::EditorError::ParseFailed) => {
+                let message = if is_zh_locale() {
+                    "无法解析编辑器命令：请检查 $VISUAL 或 $EDITOR。".to_string()
+                } else {
+                    "Failed to parse editor command.".to_string()
+                };
                 self.chat_widget
-                    .add_to_history(history_cell::new_error_event(format!(
-                        "Failed to open editor: {err}",
-                    )));
+                    .add_to_history(history_cell::new_error_event(message));
+                self.reset_external_editor_state(tui);
+                return;
+            }
+            Err(external_editor::EditorError::EmptyCommand) => {
+                let message = if is_zh_locale() {
+                    "编辑器命令为空：请检查 $VISUAL 或 $EDITOR。".to_string()
+                } else {
+                    "Editor command is empty.".to_string()
+                };
+                self.chat_widget
+                    .add_to_history(history_cell::new_error_event(message));
                 self.reset_external_editor_state(tui);
                 return;
             }
@@ -3630,10 +3702,13 @@ impl App {
                 self.chat_widget.apply_external_edit(cleaned);
             }
             Err(err) => {
+                let message = if is_zh_locale() {
+                    format!("打开编辑器失败：{err}")
+                } else {
+                    format!("Failed to open editor: {err}")
+                };
                 self.chat_widget
-                    .add_to_history(history_cell::new_error_event(format!(
-                        "Failed to open editor: {err}",
-                    )));
+                    .add_to_history(history_cell::new_error_event(message));
             }
         }
         tui.frame_requester().schedule_frame();
@@ -3642,10 +3717,13 @@ impl App {
     fn request_external_editor_launch(&mut self, tui: &mut tui::Tui) {
         self.chat_widget
             .set_external_editor_state(ExternalEditorState::Requested);
-        self.chat_widget.set_footer_hint_override(Some(vec![(
-            EXTERNAL_EDITOR_HINT.to_string(),
-            String::new(),
-        )]));
+        let hint = if is_zh_locale() {
+            "保存并关闭外部编辑器以继续。"
+        } else {
+            EXTERNAL_EDITOR_HINT
+        };
+        self.chat_widget
+            .set_footer_hint_override(Some(vec![(hint.to_string(), String::new())]));
         tui.frame_requester().schedule_frame();
     }
 

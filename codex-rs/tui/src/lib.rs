@@ -199,7 +199,9 @@ fn err_restore_terminal(err: &dyn std::fmt::Display) -> String {
     if is_zh_locale() {
         format!("恢复终端失败。请执行 `reset` 或重启终端以恢复：{err}")
     } else {
-        format!("failed to restore terminal. Run `reset` or restart your terminal to recover: {err}")
+        format!(
+            "failed to restore terminal. Run `reset` or restart your terminal to recover: {err}"
+        )
     }
 }
 #[cfg(all(not(target_os = "linux"), feature = "voice-input"))]
@@ -229,15 +231,27 @@ mod voice {
 
     impl VoiceCapture {
         pub fn start() -> Result<Self, String> {
-            Err("voice input is unavailable in this build".to_string())
+            Err(if super::is_zh_locale() {
+                "当前构建不支持语音输入".to_string()
+            } else {
+                "voice input is unavailable in this build".to_string()
+            })
         }
 
         pub fn start_realtime(_config: &Config, _tx: AppEventSender) -> Result<Self, String> {
-            Err("voice input is unavailable in this build".to_string())
+            Err(if super::is_zh_locale() {
+                "当前构建不支持语音输入".to_string()
+            } else {
+                "voice input is unavailable in this build".to_string()
+            })
         }
 
         pub fn stop(self) -> Result<RecordedAudio, String> {
-            Err("voice input is unavailable in this build".to_string())
+            Err(if super::is_zh_locale() {
+                "当前构建不支持语音输入".to_string()
+            } else {
+                "voice input is unavailable in this build".to_string()
+            })
         }
 
         pub fn data_arc(&self) -> Arc<Mutex<Vec<i16>>> {
@@ -383,9 +397,9 @@ pub async fn run_main(mut cli: Cli, arg0_paths: Arg0DispatchPaths) -> std::io::R
             if let Some(config_error) = config_error {
                 eprintln!(
                     "{}",
-                    err_loading_config_toml_with_source(
-                        &format_config_error_with_source(config_error)
-                    )
+                    err_loading_config_toml_with_source(&format_config_error_with_source(
+                        config_error
+                    ))
                 );
             } else {
                 eprintln!("{}", err_loading_config_toml(&err));

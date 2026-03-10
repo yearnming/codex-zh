@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::path::PathBuf;
 
 use crate::app_event::AppEvent;
@@ -40,6 +41,126 @@ use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn approval_title_exec(network_host: Option<&str>) -> String {
+    if let Some(host) = network_host {
+        if is_zh_locale() {
+            format!("是否允许访问网络主机 \"{host}\"？")
+        } else {
+            format!("Do you want to approve network access to \"{host}\"?")
+        }
+    } else if is_zh_locale() {
+        "是否执行以下命令？".to_string()
+    } else {
+        "Would you like to run the following command?".to_string()
+    }
+}
+
+fn approval_title_permissions() -> String {
+    if is_zh_locale() {
+        "是否授予以下权限？".to_string()
+    } else {
+        "Would you like to grant these permissions?".to_string()
+    }
+}
+
+fn approval_title_patch() -> String {
+    if is_zh_locale() {
+        "是否应用以下修改？".to_string()
+    } else {
+        "Would you like to make the following edits?".to_string()
+    }
+}
+
+fn approval_title_mcp(server_name: &str) -> String {
+    if is_zh_locale() {
+        format!("{server_name} 需要你的批准。")
+    } else {
+        format!("{server_name} needs your approval.")
+    }
+}
+
+fn label_thread() -> &'static str {
+    if is_zh_locale() {
+        "会话："
+    } else {
+        "Thread: "
+    }
+}
+
+fn label_reason() -> &'static str {
+    if is_zh_locale() {
+        "原因："
+    } else {
+        "Reason: "
+    }
+}
+
+fn label_permission_rule() -> &'static str {
+    if is_zh_locale() {
+        "权限规则："
+    } else {
+        "Permission rule: "
+    }
+}
+
+fn label_server() -> &'static str {
+    if is_zh_locale() {
+        "服务器："
+    } else {
+        "Server: "
+    }
+}
+
+fn approval_footer_hint_text(has_thread: bool) -> Line<'static> {
+    let mut spans = vec![
+        if is_zh_locale() { "按 " } else { "Press " }.into(),
+        key_hint::plain(KeyCode::Enter).into(),
+        if is_zh_locale() {
+            " 确认或按 "
+        } else {
+            " to confirm or "
+        }
+        .into(),
+        key_hint::plain(KeyCode::Esc).into(),
+        if is_zh_locale() {
+            " 取消"
+        } else {
+            " to cancel"
+        }
+        .into(),
+    ];
+    if has_thread {
+        spans.extend([
+            if is_zh_locale() { "，或按 " } else { " or " }.into(),
+            key_hint::plain(KeyCode::Char('o')).into(),
+            if is_zh_locale() {
+                " 打开会话".into()
+            } else {
+                " to open thread".into()
+            },
+        ]);
+    }
+    Line::from(spans)
+}
 
 /// Request coming from the agent that needs user approval.
 #[derive(Clone, Debug)]
@@ -156,28 +277,19 @@ impl ApprovalOverlay {
                     network_approval_context.as_ref(),
                     additional_permissions.as_ref(),
                 ),
-                network_approval_context.as_ref().map_or_else(
-                    || "Would you like to run the following command?".to_string(),
-                    |network_approval_context| {
-                        format!(
-                            "Do you want to approve network access to \"{}\"?",
-                            network_approval_context.host
-                        )
-                    },
+                approval_title_exec(
+                    network_approval_context
+                        .as_ref()
+                        .map(|context| context.host.as_str()),
                 ),
             ),
-            ApprovalRequest::Permissions { .. } => (
-                permissions_options(),
-                "Would you like to grant these permissions?".to_string(),
-            ),
-            ApprovalRequest::ApplyPatch { .. } => (
-                patch_options(),
-                "Would you like to make the following edits?".to_string(),
-            ),
-            ApprovalRequest::McpElicitation { server_name, .. } => (
-                elicitation_options(),
-                format!("{server_name} needs your approval."),
-            ),
+            ApprovalRequest::Permissions { .. } => {
+                (permissions_options(), approval_title_permissions())
+            }
+            ApprovalRequest::ApplyPatch { .. } => (patch_options(), approval_title_patch()),
+            ApprovalRequest::McpElicitation { server_name, .. } => {
+                (elicitation_options(), approval_title_mcp(server_name))
+            }
         };
 
         let header = Box::new(ColumnRenderable::with([
@@ -490,21 +602,7 @@ impl Renderable for ApprovalOverlay {
 }
 
 fn approval_footer_hint(request: &ApprovalRequest) -> Line<'static> {
-    let mut spans = vec![
-        "Press ".into(),
-        key_hint::plain(KeyCode::Enter).into(),
-        " to confirm or ".into(),
-        key_hint::plain(KeyCode::Esc).into(),
-        " to cancel".into(),
-    ];
-    if request.thread_label().is_some() {
-        spans.extend([
-            " or ".into(),
-            key_hint::plain(KeyCode::Char('o')).into(),
-            " to open thread".into(),
-        ]);
-    }
-    Line::from(spans)
+    approval_footer_hint_text(request.thread_label().is_some())
 }
 
 fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
@@ -520,20 +618,23 @@ fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
             let mut header: Vec<Line<'static>> = Vec::new();
             if let Some(thread_label) = thread_label {
                 header.push(Line::from(vec![
-                    "Thread: ".into(),
+                    label_thread().into(),
                     thread_label.clone().bold(),
                 ]));
                 header.push(Line::from(""));
             }
             if let Some(reason) = reason {
-                header.push(Line::from(vec!["Reason: ".into(), reason.clone().italic()]));
+                header.push(Line::from(vec![
+                    label_reason().into(),
+                    reason.clone().italic(),
+                ]));
                 header.push(Line::from(""));
             }
             if let Some(additional_permissions) = additional_permissions
                 && let Some(rule_line) = format_additional_permissions_rule(additional_permissions)
             {
                 header.push(Line::from(vec![
-                    "Permission rule: ".into(),
+                    label_permission_rule().into(),
                     rule_line.cyan(),
                 ]));
                 header.push(Line::from(""));
@@ -557,18 +658,21 @@ fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
             let mut header: Vec<Line<'static>> = Vec::new();
             if let Some(thread_label) = thread_label {
                 header.push(Line::from(vec![
-                    "Thread: ".into(),
+                    label_thread().into(),
                     thread_label.clone().bold(),
                 ]));
                 header.push(Line::from(""));
             }
             if let Some(reason) = reason {
-                header.push(Line::from(vec!["Reason: ".into(), reason.clone().italic()]));
+                header.push(Line::from(vec![
+                    label_reason().into(),
+                    reason.clone().italic(),
+                ]));
                 header.push(Line::from(""));
             }
             if let Some(rule_line) = format_additional_permissions_rule(permissions) {
                 header.push(Line::from(vec![
-                    "Permission rule: ".into(),
+                    label_permission_rule().into(),
                     rule_line.cyan(),
                 ]));
             }
@@ -584,7 +688,7 @@ fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
             let mut header: Vec<Box<dyn Renderable>> = Vec::new();
             if let Some(thread_label) = thread_label {
                 header.push(Box::new(Line::from(vec![
-                    "Thread: ".into(),
+                    label_thread().into(),
                     thread_label.clone().bold(),
                 ])));
                 header.push(Box::new(Line::from("")));
@@ -594,7 +698,7 @@ fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
             {
                 header.push(Box::new(
                     Paragraph::new(Line::from_iter([
-                        "Reason: ".into(),
+                        label_reason().into(),
                         reason.clone().italic(),
                     ]))
                     .wrap(Wrap { trim: false }),
@@ -613,13 +717,13 @@ fn build_header(request: &ApprovalRequest) -> Box<dyn Renderable> {
             let mut lines = Vec::new();
             if let Some(thread_label) = thread_label {
                 lines.push(Line::from(vec![
-                    "Thread: ".into(),
+                    label_thread().into(),
                     thread_label.clone().bold(),
                 ]));
                 lines.push(Line::from(""));
             }
             lines.extend([
-                Line::from(vec!["Server: ".into(), server_name.clone().bold()]),
+                Line::from(vec![label_server().into(), server_name.clone().bold()]),
                 Line::from(""),
                 Line::from(message.clone()),
             ]);
@@ -661,7 +765,13 @@ fn exec_options(
         .filter_map(|decision| match decision {
             ReviewDecision::Approved => Some(ApprovalOption {
                 label: if network_approval_context.is_some() {
-                    "Yes, just this once".to_string()
+                    if is_zh_locale() {
+                        "是，仅本次允许".to_string()
+                    } else {
+                        "Yes, just this once".to_string()
+                    }
+                } else if is_zh_locale() {
+                    "是，继续".to_string()
                 } else {
                     "Yes, proceed".to_string()
                 },
@@ -680,7 +790,14 @@ fn exec_options(
 
                 Some(ApprovalOption {
                     label: format!(
-                        "Yes, and don't ask again for commands that start with `{rendered_prefix}`"
+                        "{}",
+                        if is_zh_locale() {
+                            format!("是，并且不再询问以 `{rendered_prefix}` 开头的命令")
+                        } else {
+                            format!(
+                                "Yes, and don't ask again for commands that start with `{rendered_prefix}`"
+                            )
+                        }
                     ),
                     decision: ApprovalDecision::Review(
                         ReviewDecision::ApprovedExecpolicyAmendment {
@@ -693,9 +810,19 @@ fn exec_options(
             }
             ReviewDecision::ApprovedForSession => Some(ApprovalOption {
                 label: if network_approval_context.is_some() {
-                    "Yes, and allow this host for this conversation".to_string()
+                    if is_zh_locale() {
+                        "是，并允许本会话访问该主机".to_string()
+                    } else {
+                        "Yes, and allow this host for this conversation".to_string()
+                    }
                 } else if additional_permissions.is_some() {
-                    "Yes, and allow these permissions for this session".to_string()
+                    if is_zh_locale() {
+                        "是，并在本会话中允许这些权限".to_string()
+                    } else {
+                        "Yes, and allow these permissions for this session".to_string()
+                    }
+                } else if is_zh_locale() {
+                    "是，并在本会话中不再询问此命令".to_string()
                 } else {
                     "Yes, and don't ask again for this command in this session".to_string()
                 },
@@ -708,11 +835,19 @@ fn exec_options(
             } => {
                 let (label, shortcut) = match network_policy_amendment.action {
                     NetworkPolicyRuleAction::Allow => (
-                        "Yes, and allow this host in the future".to_string(),
+                        if is_zh_locale() {
+                            "是，并允许将来访问该主机".to_string()
+                        } else {
+                            "Yes, and allow this host in the future".to_string()
+                        },
                         KeyCode::Char('p'),
                     ),
                     NetworkPolicyRuleAction::Deny => (
-                        "No, and block this host in the future".to_string(),
+                        if is_zh_locale() {
+                            "否，并在未来阻止该主机".to_string()
+                        } else {
+                            "No, and block this host in the future".to_string()
+                        },
                         KeyCode::Char('d'),
                     ),
                 };
@@ -726,13 +861,21 @@ fn exec_options(
                 })
             }
             ReviewDecision::Denied => Some(ApprovalOption {
-                label: "No, continue without running it".to_string(),
+                label: if is_zh_locale() {
+                    "否，继续但不运行".to_string()
+                } else {
+                    "No, continue without running it".to_string()
+                },
                 decision: ApprovalDecision::Review(ReviewDecision::Denied),
                 display_shortcut: None,
                 additional_shortcuts: vec![key_hint::plain(KeyCode::Char('d'))],
             }),
             ReviewDecision::Abort => Some(ApprovalOption {
-                label: "No, and tell Codex what to do differently".to_string(),
+                label: if is_zh_locale() {
+                    "否，并告诉 Codex 该如何处理".to_string()
+                } else {
+                    "No, and tell Codex what to do differently".to_string()
+                },
                 decision: ApprovalDecision::Review(ReviewDecision::Abort),
                 display_shortcut: Some(key_hint::plain(KeyCode::Esc)),
                 additional_shortcuts: vec![key_hint::plain(KeyCode::Char('n'))],
@@ -812,19 +955,31 @@ pub(crate) fn format_additional_permissions_rule(
 fn patch_options() -> Vec<ApprovalOption> {
     vec![
         ApprovalOption {
-            label: "Yes, proceed".to_string(),
+            label: if is_zh_locale() {
+                "是，继续".to_string()
+            } else {
+                "Yes, proceed".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::Approved),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('y'))],
         },
         ApprovalOption {
-            label: "Yes, and don't ask again for these files".to_string(),
+            label: if is_zh_locale() {
+                "是，并且不再询问这些文件".to_string()
+            } else {
+                "Yes, and don't ask again for these files".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::ApprovedForSession),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('a'))],
         },
         ApprovalOption {
-            label: "No, and tell Codex what to do differently".to_string(),
+            label: if is_zh_locale() {
+                "否，并告诉 Codex 该如何处理".to_string()
+            } else {
+                "No, and tell Codex what to do differently".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::Abort),
             display_shortcut: Some(key_hint::plain(KeyCode::Esc)),
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('n'))],
@@ -835,19 +990,31 @@ fn patch_options() -> Vec<ApprovalOption> {
 fn permissions_options() -> Vec<ApprovalOption> {
     vec![
         ApprovalOption {
-            label: "Yes, grant these permissions".to_string(),
+            label: if is_zh_locale() {
+                "是，授予这些权限".to_string()
+            } else {
+                "Yes, grant these permissions".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::Approved),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('y'))],
         },
         ApprovalOption {
-            label: "Yes, grant these permissions for this session".to_string(),
+            label: if is_zh_locale() {
+                "是，仅本会话授予这些权限".to_string()
+            } else {
+                "Yes, grant these permissions for this session".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::ApprovedForSession),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('a'))],
         },
         ApprovalOption {
-            label: "No, continue without permissions".to_string(),
+            label: if is_zh_locale() {
+                "否，继续但不授予权限".to_string()
+            } else {
+                "No, continue without permissions".to_string()
+            },
             decision: ApprovalDecision::Review(ReviewDecision::Denied),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('n'))],
@@ -858,19 +1025,31 @@ fn permissions_options() -> Vec<ApprovalOption> {
 fn elicitation_options() -> Vec<ApprovalOption> {
     vec![
         ApprovalOption {
-            label: "Yes, provide the requested info".to_string(),
+            label: if is_zh_locale() {
+                "是，提供所需信息".to_string()
+            } else {
+                "Yes, provide the requested info".to_string()
+            },
             decision: ApprovalDecision::McpElicitation(ElicitationAction::Accept),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('y'))],
         },
         ApprovalOption {
-            label: "No, but continue without it".to_string(),
+            label: if is_zh_locale() {
+                "否，继续但不提供".to_string()
+            } else {
+                "No, but continue without it".to_string()
+            },
             decision: ApprovalDecision::McpElicitation(ElicitationAction::Decline),
             display_shortcut: None,
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('n'))],
         },
         ApprovalOption {
-            label: "Cancel this request".to_string(),
+            label: if is_zh_locale() {
+                "取消该请求".to_string()
+            } else {
+                "Cancel this request".to_string()
+            },
             decision: ApprovalDecision::McpElicitation(ElicitationAction::Cancel),
             display_shortcut: Some(key_hint::plain(KeyCode::Esc)),
             additional_shortcuts: vec![key_hint::plain(KeyCode::Char('c'))],
@@ -924,6 +1103,28 @@ mod tests {
         .fold(rendered, |rendered, (path, normalized)| {
             rendered.replace(&path.display().to_string(), normalized)
         })
+    }
+
+    fn render_overlay_lines_with_locale(
+        view: &ApprovalOverlay,
+        width: u16,
+        locale: &str,
+    ) -> String {
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, locale);
+        }
+        let rendered = render_overlay_lines(view, width);
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
+        rendered
     }
 
     fn make_exec_request() -> ApprovalRequest {
@@ -1037,7 +1238,7 @@ mod tests {
 
         assert_snapshot!(
             "approval_overlay_cross_thread_prompt",
-            render_overlay_lines(&view, 80)
+            render_overlay_lines_with_locale(&view, 80, "en-US")
         );
     }
 
@@ -1331,7 +1532,7 @@ mod tests {
         assert!(
             rendered
                 .iter()
-                .any(|line| line.contains("Permission rule:")),
+                .any(|line| line.contains("Permission rule:") || line.contains("权限规则：")),
             "expected permission-rule line, got {rendered:?}"
         );
         assert!(
@@ -1367,7 +1568,7 @@ mod tests {
         let view = ApprovalOverlay::new(exec_request, tx, Features::with_defaults());
         assert_snapshot!(
             "approval_overlay_additional_permissions_prompt",
-            normalize_snapshot_paths(render_overlay_lines(&view, 120))
+            normalize_snapshot_paths(render_overlay_lines_with_locale(&view, 120, "en-US"))
         );
     }
 
@@ -1378,7 +1579,7 @@ mod tests {
         let view = ApprovalOverlay::new(make_permissions_request(), tx, Features::with_defaults());
         assert_snapshot!(
             "approval_overlay_permissions_prompt",
-            normalize_snapshot_paths(render_overlay_lines(&view, 120))
+            normalize_snapshot_paths(render_overlay_lines_with_locale(&view, 120, "en-US"))
         );
     }
 
@@ -1411,7 +1612,7 @@ mod tests {
         let view = ApprovalOverlay::new(exec_request, tx, Features::with_defaults());
         assert_snapshot!(
             "approval_overlay_additional_permissions_macos_prompt",
-            render_overlay_lines(&view, 120)
+            render_overlay_lines_with_locale(&view, 120, "en-US")
         );
     }
 
@@ -1444,8 +1645,21 @@ mod tests {
         };
 
         let view = ApprovalOverlay::new(exec_request, tx, Features::with_defaults());
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, "en-US");
+        }
         let mut buf = Buffer::empty(Rect::new(0, 0, 100, view.desired_height(100)));
         view.render(Rect::new(0, 0, 100, view.desired_height(100)), &mut buf);
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
         assert_snapshot!("network_exec_prompt", format!("{buf:?}"));
 
         let rendered: Vec<String> = (0..buf.area.height)
@@ -1459,6 +1673,7 @@ mod tests {
         assert!(
             rendered.iter().any(|line| {
                 line.contains("Do you want to approve network access to \"example.com\"?")
+                    || line.contains("是否允许访问网络主机 \"example.com\"？")
             }),
             "expected network title to include host, got {rendered:?}"
         );

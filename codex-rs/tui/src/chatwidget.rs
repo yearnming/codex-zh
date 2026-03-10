@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -38,6 +39,32 @@ use std::time::Duration;
 use std::time::Instant;
 
 use self::realtime::PendingSteerCompareKey;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn paste_image_failed_message(err: &dyn std::fmt::Display) -> String {
+    if is_zh_locale() {
+        format!("粘贴图片失败：{err}")
+    } else {
+        format!("Failed to paste image: {err}")
+    }
+}
 use crate::app_event::RealtimeAudioDeviceKind;
 #[cfg(all(not(target_os = "linux"), feature = "voice-input"))]
 use crate::audio_device::list_realtime_audio_device_names;
@@ -3726,9 +3753,9 @@ impl ChatWidget {
                     }
                     Err(err) => {
                         tracing::warn!("failed to paste image: {err}");
-                        self.add_to_history(history_cell::new_error_event(format!(
-                            "Failed to paste image: {err}",
-                        )));
+                        self.add_to_history(history_cell::new_error_event(
+                            paste_image_failed_message(&err),
+                        ));
                     }
                 }
                 return;
@@ -3908,7 +3935,11 @@ impl ChatWidget {
             return true;
         }
 
-        let message = "Ctrl+L is disabled while a task is in progress.".to_string();
+        let message = if crate::is_zh_locale() {
+            "任务进行中，Ctrl+L 已禁用。".to_string()
+        } else {
+            "Ctrl+L is disabled while a task is in progress.".to_string()
+        };
         self.add_to_history(history_cell::new_error_event(message));
         self.request_redraw();
         false
@@ -3916,10 +3947,14 @@ impl ChatWidget {
 
     fn dispatch_command(&mut self, cmd: SlashCommand) {
         if !cmd.available_during_task() && self.bottom_pane.is_task_running() {
-            let message = format!(
-                "'/{}' is disabled while a task is in progress.",
-                cmd.command()
-            );
+            let message = if crate::is_zh_locale() {
+                format!("任务进行中，已禁用 '/{}'.", cmd.command())
+            } else {
+                format!(
+                    "'/{}' is disabled while a task is in progress.",
+                    cmd.command()
+                )
+            };
             self.add_to_history(history_cell::new_error_event(message));
             self.bottom_pane.drain_pending_submission_state();
             self.request_redraw();
@@ -4254,10 +4289,14 @@ impl ChatWidget {
             return;
         }
         if !cmd.available_during_task() && self.bottom_pane.is_task_running() {
-            let message = format!(
-                "'/{}' is disabled while a task is in progress.",
-                cmd.command()
-            );
+            let message = if crate::is_zh_locale() {
+                format!("任务进行中，已禁用 '/{}'.", cmd.command())
+            } else {
+                format!(
+                    "'/{}' is disabled while a task is in progress.",
+                    cmd.command()
+                )
+            };
             self.add_to_history(history_cell::new_error_event(message));
             self.request_redraw();
             return;
@@ -4283,7 +4322,12 @@ impl ChatWidget {
                         self.add_info_message(format!("Fast mode is {status}."), None);
                     }
                     _ => {
-                        self.add_error_message("Usage: /fast [on|off|status]".to_string());
+                        let message = if crate::is_zh_locale() {
+                            "用法：/fast [on|off|status]".to_string()
+                        } else {
+                            "Usage: /fast [on|off|status]".to_string()
+                        };
+                        self.add_error_message(message);
                     }
                 }
             }
@@ -4296,7 +4340,12 @@ impl ChatWidget {
                     return;
                 };
                 let Some(name) = codex_core::util::normalize_thread_name(&prepared_args) else {
-                    self.add_error_message("Thread name cannot be empty.".to_string());
+                    let message = if crate::is_zh_locale() {
+                        "线程名称不能为空。".to_string()
+                    } else {
+                        "Thread name cannot be empty.".to_string()
+                    };
+                    self.add_error_message(message);
                     return;
                 };
                 let cell = Self::rename_confirmation_cell(&name, self.thread_id);
@@ -4386,8 +4435,13 @@ impl ChatWidget {
             None,
             Box::new(move |name: String| {
                 let Some(name) = codex_core::util::normalize_thread_name(&name) else {
+                    let message = if crate::is_zh_locale() {
+                        "线程名称不能为空。".to_string()
+                    } else {
+                        "Thread name cannot be empty.".to_string()
+                    };
                     tx.send(AppEvent::InsertHistoryCell(Box::new(
-                        history_cell::new_error_event("Thread name cannot be empty.".to_string()),
+                        history_cell::new_error_event(message),
                     )));
                     return;
                 };

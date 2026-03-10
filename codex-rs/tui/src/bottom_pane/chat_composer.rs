@@ -238,9 +238,13 @@ use tokio::runtime::Handle;
 const LARGE_PASTE_CHAR_THRESHOLD: usize = 1000;
 
 fn user_input_too_large_message(actual_chars: usize) -> String {
-    format!(
-        "Message exceeds the maximum length of {MAX_USER_INPUT_TEXT_CHARS} characters ({actual_chars} provided)."
-    )
+    if crate::is_zh_locale() {
+        format!("消息长度超过上限 {MAX_USER_INPUT_TEXT_CHARS} 个字符（当前 {actual_chars} 个）。")
+    } else {
+        format!(
+            "Message exceeds the maximum length of {MAX_USER_INPUT_TEXT_CHARS} characters ({actual_chars} provided)."
+        )
+    }
 }
 
 /// Result returned when the user interacts with the text area.
@@ -2320,9 +2324,13 @@ impl ChatComposer {
                     })
                     .unwrap_or(false);
                 if !is_builtin && !is_known_prompt {
-                    let message = format!(
-                        r#"Unrecognized command '/{name}'. Type "/" for a list of supported commands."#
-                    );
+                    let message = if crate::is_zh_locale() {
+                        format!("无法识别命令 '/{name}'。输入 \"/\" 查看支持的命令列表。")
+                    } else {
+                        format!(
+                            r#"Unrecognized command '/{name}'. Type "/" for a list of supported commands."#
+                        )
+                    };
                     self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
                         history_cell::new_info_event(message, None),
                     )));
@@ -2592,10 +2600,14 @@ impl ChatComposer {
         if !self.is_task_running || cmd.available_during_task() {
             return false;
         }
-        let message = format!(
-            "'/{}' is disabled while a task is in progress.",
-            cmd.command()
-        );
+        let message = if crate::is_zh_locale() {
+            format!("任务进行中，已禁用 '/{}'.", cmd.command())
+        } else {
+            format!(
+                "'/{}' is disabled while a task is in progress.",
+                cmd.command()
+            )
+        };
         self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
             history_cell::new_error_event(message),
         )));
@@ -6632,6 +6644,11 @@ mod tests {
         use crossterm::event::KeyEvent;
         use crossterm::event::KeyModifiers;
 
+        let prev = std::env::var("CODEX_LOCALE").ok();
+        unsafe {
+            std::env::set_var("CODEX_LOCALE", "en-US");
+        }
+
         let (tx, mut rx) = unbounded_channel::<AppEvent>();
         let sender = AppEventSender::new(tx);
         let mut composer = ChatComposer::new(
@@ -6667,6 +6684,15 @@ mod tests {
             }
         }
         assert!(found_error, "expected error history cell to be sent");
+
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var("CODEX_LOCALE", value);
+            },
+            None => unsafe {
+                std::env::remove_var("CODEX_LOCALE");
+            },
+        }
     }
 
     #[test]

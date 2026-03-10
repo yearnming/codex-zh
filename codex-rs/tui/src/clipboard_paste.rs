@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 use std::path::PathBuf;
 use tempfile::Builder;
@@ -13,14 +14,56 @@ pub enum PasteImageError {
 impl std::fmt::Display for PasteImageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PasteImageError::ClipboardUnavailable(msg) => write!(f, "clipboard unavailable: {msg}"),
-            PasteImageError::NoImage(msg) => write!(f, "no image on clipboard: {msg}"),
-            PasteImageError::EncodeFailed(msg) => write!(f, "could not encode image: {msg}"),
-            PasteImageError::IoError(msg) => write!(f, "io error: {msg}"),
+            PasteImageError::ClipboardUnavailable(msg) => {
+                if is_zh_locale() {
+                    write!(f, "剪贴板不可用：{msg}")
+                } else {
+                    write!(f, "clipboard unavailable: {msg}")
+                }
+            }
+            PasteImageError::NoImage(msg) => {
+                if is_zh_locale() {
+                    write!(f, "剪贴板中没有图片：{msg}")
+                } else {
+                    write!(f, "no image on clipboard: {msg}")
+                }
+            }
+            PasteImageError::EncodeFailed(msg) => {
+                if is_zh_locale() {
+                    write!(f, "图片编码失败：{msg}")
+                } else {
+                    write!(f, "could not encode image: {msg}")
+                }
+            }
+            PasteImageError::IoError(msg) => {
+                if is_zh_locale() {
+                    write!(f, "IO 错误：{msg}")
+                } else {
+                    write!(f, "io error: {msg}")
+                }
+            }
         }
     }
 }
 impl std::error::Error for PasteImageError {}
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
+        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+
+    let Some(locale) = locale else {
+        return false;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncodedImageFormat {
@@ -111,9 +154,12 @@ pub fn paste_image_as_png() -> Result<(Vec<u8>, PastedImageInfo), PasteImageErro
 /// Android/Termux does not support arboard; return a clear error.
 #[cfg(target_os = "android")]
 pub fn paste_image_as_png() -> Result<(Vec<u8>, PastedImageInfo), PasteImageError> {
-    Err(PasteImageError::ClipboardUnavailable(
-        "clipboard image paste is unsupported on Android".into(),
-    ))
+    let msg = if is_zh_locale() {
+        "Android 平台不支持从剪贴板粘贴图片"
+    } else {
+        "clipboard image paste is unsupported on Android"
+    };
+    Err(PasteImageError::ClipboardUnavailable(msg.into()))
 }
 
 /// Convenience: write to a temp file and return its path + info.
