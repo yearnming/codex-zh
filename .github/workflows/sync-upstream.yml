@@ -1,0 +1,41 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Sync l10n branch
+        env:
+          UPSTREAM_URL: https://github.com/openai/codex.git
+          UPSTREAM_REMOTE: upstream
+          DEFAULT_BRANCH: main
+          L10N_BRANCH: l10n/zh
+        run: |
+          chmod +x scripts/sync_upstream.sh
+          scripts/sync_upstream.sh
+      - name: Create PR for l10n updates
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: sync/l10n-zh
+          base: l10n/zh
+          title: "chore: sync upstream"
+          body: |
+            自动同步 upstream/main 后重放中文化补丁。
+          commit-message: "chore: sync upstream"
+          delete-branch: true
+
