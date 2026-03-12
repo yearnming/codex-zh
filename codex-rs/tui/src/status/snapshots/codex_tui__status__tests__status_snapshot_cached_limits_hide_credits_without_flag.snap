@@ -7,17 +7,17 @@ expression: sanitized
 ╭─────────────────────────────────────────────────────────────────────╮
 │  >_ OpenAI Codex (v0.0.0)                                           │
 │                                                                     │
-│ Visit https://chatgpt.com/codex/settings/usage for up-to-date       │
-│ information on rate limits and credits                              │
+│ 访问 https://chatgpt.com/codex/settings/usage 查看最新的            │
+│ 限额与额度信息                                                      │
 │                                                                     │
-│  Model:            gpt-5.1-codex (reasoning none, summaries auto)   │
-│  Directory: [[workspace]]                                           │
-│  Permissions:      Custom (read-only, on-request)                   │
-│  Agents.md:        <none>                                           │
+│  模型:           gpt-5.1-codex (推理 无, 摘要 自动)                 │
+│  目录:           [[workspace]]                                      │
+│  权限:           自定义（只读，按需审批）                           │
+│  Agents.md:      无                                                 │
 │                                                                     │
-│  Token usage:      1.05K total  (700 input + 350 output)            │
-│  Context window:   100% left (1.45K used / 272K)                    │
-│  5h limit:         [████████░░░░░░░░░░░░] 40% left (resets 11:32)   │
-│  Weekly limit:     [█████████████░░░░░░░] 65% left (resets 11:52)   │
-│  Warning:          limits may be stale - start new turn to refresh. │
+│  Token 使用量:   1.05K 总计  (700 输入 + 350 输出)                  │
+│  上下文窗口:     100% 剩余 (1.45K 已用 / 272K)                      │
+│  5小时 限额:        [████████░░░░░░░░░░░░] 剩余 40% （重置 11:32）  │
+│  每周 限额:    [█████████████░░░░░░░] 剩余 65% （重置 11:52）       │
+│  警告:           限额数据可能过期，开始新回合以刷新。               │
 ╰─────────────────────────────────────────────────────────────────────╯

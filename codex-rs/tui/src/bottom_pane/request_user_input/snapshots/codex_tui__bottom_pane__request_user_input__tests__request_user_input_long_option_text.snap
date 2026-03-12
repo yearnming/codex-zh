@@ -3,15 +3,12 @@ source: tui/src/bottom_pane/request_user_input/mod.rs
 expression: "render_snapshot(&overlay, area)"
 ---
                                                                                                                         
-  Question 1/1 (1 unanswered)                                                                                           
-  Choose one option.                                                                                                    
+  问题 1/1（1 未回答）                                                                                                  
+  请选择一个选项。                                                                                                      
                                                                                                                         
-  › 1. Job: running/completed/failed/expired; Run/Experiment: succeeded/failed/    Keep async job statuses for          
-       unknown (Recommended when triaging long-running background work and status  progress tracking and include        
-       transitions)                                                                enough context for debugging         
-                                                                                   retries, stale workers, and          
-                                                                                   unexpected expiration paths.         
-    2. Add a short status model                                                    Simpler labels with less detail for  
-                                                                                   quick rollouts.                      
+  › 1. Job：运行中/已完成/失败/已过期；Run/Experiment：成功/失败/              保留异步任务状态用于进度追踪，              
+       未知（建议用于排查长时间后台任务与状态流转）                            并包含足够上下文以排查重试、              
+                                                                                   过期工作进程和意外过期路径。            
+    2. 添加简短状态模型                                                          更简洁的标签与更少细节，便于快速发布。      
                                                                                                                         
-  tab to add notes | enter to submit answer | esc to interrupt
+  tab 添加备注 | enter 提交答案 | 按 esc 中断

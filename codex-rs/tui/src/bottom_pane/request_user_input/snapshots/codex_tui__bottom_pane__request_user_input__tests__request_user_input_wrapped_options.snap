@@ -3,11 +3,11 @@ source: tui/src/bottom_pane/request_user_input/mod.rs
 expression: "render_snapshot(&overlay, area)"
 ---
                                                                                                               
-  Question 1/1 (1 unanswered)                                                                                 
-  Choose the next step for this task.                                                                         
+  问题 1/1（1 未回答）                                                                                       
+  为此任务选择下一步。                                                                                              
                                                                                                               
-  › 1. Discuss a code change  Walk through a plan, then implement it together with careful checks.            
-    2. Run targeted tests     Pick the most relevant crate and validate the current behavior first.           
-    3. Review the diff        Summarize the changes and highlight the most important risks and gaps.          
+  › 1. 讨论代码改动  先梳理计划，再一起实现，并进行仔细检查。                                                        
+    2. 运行针对性测试  选择最相关的 crate，先验证当前行为。                                                        
+    3. 审查差异  总结更改并强调最重要的风险与空缺。                                                                 
                                                                                                               
-  tab to add notes | enter to submit answer | esc to interrupt
+  tab 添加备注 | enter 提交答案 | 按 esc 中断

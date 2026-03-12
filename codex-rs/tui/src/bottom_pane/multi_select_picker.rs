@@ -59,7 +59,13 @@ use crate::text_formatting::truncate_text;
 const ITEM_NAME_TRUNCATE_LEN: usize = 21;
 
 /// Placeholder text shown in the search input when empty.
-const SEARCH_PLACEHOLDER: &str = "Type to search";
+fn search_placeholder() -> &'static str {
+    if crate::is_zh_locale() {
+        "输入以搜索"
+    } else {
+        "Type to search"
+    }
+}
 
 /// Prefix displayed before the search query (mimics a command prompt).
 const SEARCH_PROMPT_PREFIX: &str = "> ";
@@ -541,7 +547,7 @@ impl Renderable for MultiSelectPicker {
         if search_area.height >= 2 {
             let [placeholder_area, input_area] =
                 Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(search_area);
-            Line::from(SEARCH_PLACEHOLDER.dim()).render(placeholder_area, buf);
+            Line::from(search_placeholder().dim()).render(placeholder_area, buf);
             let line = if self.search_query.is_empty() {
                 Line::from(vec![SEARCH_PROMPT_PREFIX.dim()])
             } else {
@@ -553,7 +559,7 @@ impl Renderable for MultiSelectPicker {
             line.render(input_area, buf);
         } else if search_area.height > 0 {
             let query_span = if self.search_query.is_empty() {
-                SEARCH_PLACEHOLDER.dim()
+                search_placeholder().dim()
             } else {
                 self.search_query.clone().into()
             };
@@ -573,7 +579,11 @@ impl Renderable for MultiSelectPicker {
                 &rows,
                 &self.state,
                 render_area.height as usize,
-                "no matches",
+                if crate::is_zh_locale() {
+                    "没有匹配结果"
+                } else {
+                    "no matches"
+                },
             );
         }
 
@@ -727,14 +737,31 @@ impl MultiSelectPickerBuilder {
         }
 
         let instructions = if self.instructions.is_empty() {
+            let is_zh = crate::is_zh_locale();
             vec![
-                "Press ".into(),
+                if is_zh {
+                    "按 ".into()
+                } else {
+                    "Press ".into()
+                },
                 key_hint::plain(KeyCode::Char(' ')).into(),
-                " to toggle; ".into(),
+                if is_zh {
+                    " 切换；按 ".into()
+                } else {
+                    " to toggle; ".into()
+                },
                 key_hint::plain(KeyCode::Enter).into(),
-                " to confirm and close; ".into(),
+                if is_zh {
+                    " 确认并关闭；按 ".into()
+                } else {
+                    " to confirm and close; ".into()
+                },
                 key_hint::plain(KeyCode::Esc).into(),
-                " to close".into(),
+                if is_zh {
+                    " 关闭".into()
+                } else {
+                    " to close".into()
+                },
             ]
         } else {
             self.instructions

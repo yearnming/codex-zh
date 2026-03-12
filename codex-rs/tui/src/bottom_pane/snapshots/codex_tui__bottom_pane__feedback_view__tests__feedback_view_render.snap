@@ -5,7 +5,7 @@ expression: rendered
   Do you want to upload logs before reporting issue?
 
   Logs may include the full conversation history of this Codex process
-  These logs are retained for 90 days and are used solely for troubles
+  These logs are retained for 90 days and are 已使用 solely for troubles
 
   You can review the exact content of the logs before they’re uploaded
   <LOG_PATH>

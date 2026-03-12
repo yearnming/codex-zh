@@ -85,23 +85,44 @@ impl AppLinkView {
     }
 
     fn action_labels(&self) -> Vec<&'static str> {
+        let is_zh = crate::is_zh_locale();
         match self.screen {
             AppLinkScreen::Link => {
                 if self.is_installed {
                     vec![
-                        "Manage on ChatGPT",
+                        if is_zh {
+                            "在 ChatGPT 中管理"
+                        } else {
+                            "Manage on ChatGPT"
+                        },
                         if self.is_enabled {
-                            "Disable app"
+                            if is_zh { "禁用应用" } else { "Disable app" }
+                        } else if is_zh {
+                            "启用应用"
                         } else {
                             "Enable app"
                         },
-                        "Back",
+                        if is_zh { "返回" } else { "Back" },
                     ]
                 } else {
-                    vec!["Install on ChatGPT", "Back"]
+                    vec![
+                        if is_zh {
+                            "在 ChatGPT 中安装"
+                        } else {
+                            "Install on ChatGPT"
+                        },
+                        if is_zh { "返回" } else { "Back" },
+                    ]
                 }
             }
-            AppLinkScreen::InstallConfirmation => vec!["I already Installed it", "Back"],
+            AppLinkScreen::InstallConfirmation => vec![
+                if is_zh {
+                    "我已安装"
+                } else {
+                    "I already Installed it"
+                },
+                if is_zh { "返回" } else { "Back" },
+            ],
         }
     }
 
@@ -168,6 +189,7 @@ impl AppLinkView {
         let usable_width = width.max(1) as usize;
         let mut lines: Vec<Line<'static>> = Vec::new();
 
+        let is_zh = crate::is_zh_locale();
         lines.push(Line::from(self.title.clone().bold()));
         if let Some(description) = self
             .description
@@ -182,7 +204,14 @@ impl AppLinkView {
 
         lines.push(Line::from(""));
         if self.is_installed {
-            for line in wrap("Use $ to insert this app into the prompt.", usable_width) {
+            for line in wrap(
+                if is_zh {
+                    "使用 $ 将此应用插入提示中。"
+                } else {
+                    "Use $ to insert this app into the prompt."
+                },
+                usable_width,
+            ) {
                 lines.push(Line::from(line.into_owned()));
             }
             lines.push(Line::from(""));
@@ -194,14 +223,22 @@ impl AppLinkView {
                 lines.push(Line::from(line.into_owned()));
             }
             for line in wrap(
-                "Newly installed apps can take a few minutes to appear in /apps.",
+                if is_zh {
+                    "新安装的应用可能需要几分钟才会显示在 /apps 中。"
+                } else {
+                    "Newly installed apps can take a few minutes to appear in /apps."
+                },
                 usable_width,
             ) {
                 lines.push(Line::from(line.into_owned()));
             }
             if !self.is_installed {
                 for line in wrap(
-                    "After installed, use $ to insert this app into the prompt.",
+                    if is_zh {
+                        "安装完成后，使用 $ 将此应用插入提示中。"
+                    } else {
+                        "After installed, use $ to insert this app into the prompt."
+                    },
                     usable_width,
                 ) {
                     lines.push(Line::from(line.into_owned()));
@@ -217,24 +254,44 @@ impl AppLinkView {
         let usable_width = width.max(1) as usize;
         let mut lines: Vec<Line<'static>> = Vec::new();
 
-        lines.push(Line::from("Finish App Setup".bold()));
+        let is_zh = crate::is_zh_locale();
+        lines.push(Line::from(
+            if is_zh {
+                "完成应用设置"
+            } else {
+                "Finish App Setup"
+            }
+            .bold(),
+        ));
         lines.push(Line::from(""));
 
         for line in wrap(
-            "Complete app setup on ChatGPT in the browser window that just opened.",
+            if is_zh {
+                "在刚刚打开的浏览器窗口中完成 ChatGPT 上的应用设置。"
+            } else {
+                "Complete app setup on ChatGPT in the browser window that just opened."
+            },
             usable_width,
         ) {
             lines.push(Line::from(line.into_owned()));
         }
         for line in wrap(
-            "Sign in there if needed, then return here and select \"I already Installed it\".",
+            if is_zh {
+                "如有需要请先登录，然后返回这里选择“我已安装”。"
+            } else {
+                "Sign in there if needed, then return here and select \"I already Installed it\"."
+            },
             usable_width,
         ) {
             lines.push(Line::from(line.into_owned()));
         }
 
         lines.push(Line::from(""));
-        lines.push(Line::from(vec!["Setup URL:".dim()]));
+        lines.push(Line::from(vec![if is_zh {
+            "设置链接：".dim()
+        } else {
+            "Setup URL:".dim()
+        }]));
         let url_line = Line::from(vec![self.url.clone().cyan().underlined()]);
         lines.extend(adaptive_wrap_lines(
             vec![url_line],
@@ -275,18 +332,35 @@ impl AppLinkView {
     }
 
     fn hint_line(&self) -> Line<'static> {
+        let is_zh = crate::is_zh_locale();
         Line::from(vec![
-            "Use ".into(),
+            if is_zh {
+                "使用 ".into()
+            } else {
+                "Use ".into()
+            },
             key_hint::plain(KeyCode::Tab).into(),
             " / ".into(),
             key_hint::plain(KeyCode::Up).into(),
             " ".into(),
             key_hint::plain(KeyCode::Down).into(),
-            " to move, ".into(),
+            if is_zh {
+                " 移动，".into()
+            } else {
+                " to move, ".into()
+            },
             key_hint::plain(KeyCode::Enter).into(),
-            " to select, ".into(),
+            if is_zh {
+                " 选择，".into()
+            } else {
+                " to select, ".into()
+            },
             key_hint::plain(KeyCode::Esc).into(),
-            " to close".into(),
+            if is_zh {
+                " 关闭".into()
+            } else {
+                " to close".into()
+            },
         ])
     }
 }
@@ -426,7 +500,11 @@ impl crate::render::renderable::Renderable for AppLinkView {
                 &action_rows,
                 &action_state,
                 action_rows.len().max(1),
-                "No actions",
+                if crate::is_zh_locale() {
+                    "没有可用操作"
+                } else {
+                    "No actions"
+                },
             );
         }
 
@@ -468,7 +546,11 @@ mod tests {
 
         assert_eq!(
             view.action_labels(),
-            vec!["Manage on ChatGPT", "Disable app", "Back"]
+            if crate::is_zh_locale() {
+                vec!["在 ChatGPT 中管理", "禁用应用", "返回"]
+            } else {
+                vec!["Manage on ChatGPT", "Disable app", "Back"]
+            }
         );
     }
 
@@ -502,7 +584,11 @@ mod tests {
 
         assert_eq!(
             view.action_labels(),
-            vec!["Manage on ChatGPT", "Enable app", "Back"]
+            if crate::is_zh_locale() {
+                vec!["在 ChatGPT 中管理", "启用应用", "返回"]
+            } else {
+                vec!["Manage on ChatGPT", "Enable app", "Back"]
+            }
         );
     }
 

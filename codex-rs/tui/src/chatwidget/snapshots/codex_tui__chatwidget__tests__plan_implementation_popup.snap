@@ -2,9 +2,9 @@
 source: tui/src/chatwidget/tests.rs
 expression: popup
 ---
-  Implement this plan?
+  实现这个计划？
 
-› 1. Yes, implement this plan  Switch to Default and start coding.
-  2. No, stay in Plan mode     Continue planning with the model.
+› 1. 是，执行该计划            切换到默认模式并开始编码。
+  2. 否，保持计划模式           继续与模型制定计划。
 
-  Press enter to confirm or esc to go back
+  按 Enter 确认或按 Esc 返回

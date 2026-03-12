@@ -2,10 +2,10 @@
 source: tui/src/chatwidget/tests.rs
 expression: popup
 ---
-  Select Personality
-  Choose a communication style for Codex.
+  选择性格
+  选择 Codex 的沟通风格。
 
-  1. Friendly             Warm, collaborative, and helpful.
-› 2. Pragmatic (current)  Concise, task-focused, and direct.
+  1. 友好                 温暖、协作且乐于助人。
+› 2. 务实（当前）        简洁、任务导向、直接。
 
-  Press enter to confirm or esc to go back
+  按 enter 确认或按 esc 返回

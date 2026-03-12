@@ -19,15 +19,10 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }

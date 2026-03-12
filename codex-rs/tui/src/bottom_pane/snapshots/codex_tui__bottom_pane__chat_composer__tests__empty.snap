@@ -3,7 +3,7 @@ source: tui/src/bottom_pane/chat_composer.rs
 expression: terminal.backend()
 ---
 "                                                                                                    "
-"› Ask Codex to do anything                                                                          "
+"› 让 Codex 做任何事                                                                          "
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
@@ -11,4 +11,4 @@ expression: terminal.backend()
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
-"  ? for shortcuts                                                                100% context left  "
+"  ? 查看快捷键                                                                100% 剩余上下文       "

@@ -3,6 +3,7 @@ mod pid_tracker;
 #[cfg(target_os = "macos")]
 mod seatbelt;
 
+use std::env;
 use std::path::PathBuf;
 
 use codex_core::config::Config;
@@ -23,6 +24,22 @@ use crate::exit_status::handle_exit_status;
 
 #[cfg(target_os = "macos")]
 use seatbelt::DenialLogger;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
 
 #[cfg(target_os = "macos")]
 pub async fn run_command_under_seatbelt(
@@ -51,7 +68,13 @@ pub async fn run_command_under_seatbelt(
     _command: SeatbeltCommand,
     _codex_linux_sandbox_exe: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    anyhow::bail!("Seatbelt sandbox is only available on macOS");
+    anyhow::bail!(
+        "{}",
+        t(
+            "Seatbelt sandbox is only available on macOS",
+            "Seatbelt 沙箱仅支持 macOS",
+        )
+    );
 }
 
 pub async fn run_command_under_landlock(
@@ -183,11 +206,16 @@ async fn run_command_under_sandbox(
             let capture = match res {
                 Ok(Ok(v)) => v,
                 Ok(Err(err)) => {
-                    eprintln!("windows sandbox failed: {err}");
+                    eprintln!("{}", t("Windows sandbox failed", "Windows 沙箱执行失败"));
+                    eprintln!("{err}");
                     std::process::exit(1);
                 }
                 Err(join_err) => {
-                    eprintln!("windows sandbox join error: {join_err}");
+                    eprintln!(
+                        "{}",
+                        t("Windows sandbox join error", "Windows 沙箱任务等待失败")
+                    );
+                    eprintln!("{join_err}");
                     std::process::exit(1);
                 }
             };
@@ -205,7 +233,13 @@ async fn run_command_under_sandbox(
         }
         #[cfg(not(target_os = "windows"))]
         {
-            anyhow::bail!("Windows sandbox is only available on Windows");
+            anyhow::bail!(
+                "{}",
+                t(
+                    "Windows sandbox is only available on Windows",
+                    "Windows 沙箱仅支持 Windows",
+                )
+            );
         }
     }
 
@@ -227,7 +261,16 @@ async fn run_command_under_sandbox(
                 NetworkProxyAuditMetadata::default(),
             )
             .await
-            .map_err(|err| anyhow::anyhow!("failed to start managed network proxy: {err}"))?,
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "{}",
+                    if is_zh_locale() {
+                        format!("启动托管网络代理失败：{err}")
+                    } else {
+                        format!("failed to start managed network proxy: {err}")
+                    }
+                )
+            })?,
         ),
         None => None,
     };
@@ -252,9 +295,10 @@ async fn run_command_under_sandbox(
         SandboxType::Landlock => {
             use codex_core::features::Feature;
             #[expect(clippy::expect_used)]
-            let codex_linux_sandbox_exe = config
-                .codex_linux_sandbox_exe
-                .expect("codex-linux-sandbox executable not found");
+            let codex_linux_sandbox_exe = config.codex_linux_sandbox_exe.expect(t(
+                "codex-linux-sandbox executable not found",
+                "未找到 codex-linux-sandbox 可执行文件",
+            ));
             let use_bwrap_sandbox = config.features.enabled(Feature::UseLinuxSandboxBwrap);
             spawn_command_under_linux_sandbox(
                 codex_linux_sandbox_exe,
@@ -284,9 +328,9 @@ async fn run_command_under_sandbox(
     #[cfg(target_os = "macos")]
     if let Some(denial_logger) = denial_logger {
         let denials = denial_logger.finish().await;
-        eprintln!("\n=== Sandbox denials ===");
+        eprintln!("\n{}", t("=== Sandbox denials ===", "=== 沙箱拒绝记录 ==="));
         if denials.is_empty() {
-            eprintln!("None found.");
+            eprintln!("{}", t("None found.", "未发现记录。"));
         } else {
             for seatbelt::SandboxDenial { name, capability } in denials {
                 eprintln!("({name}) {capability}");

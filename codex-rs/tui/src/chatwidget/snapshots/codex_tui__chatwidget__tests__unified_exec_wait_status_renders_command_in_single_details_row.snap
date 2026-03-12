@@ -2,10 +2,10 @@
 source: tui/src/chatwidget/tests.rs
 expression: rendered
 ---
-• Waiting for background terminal (0s • esc to …
+• 等待后台终端 (0秒 • 按 esc…
   └ cargo test -p codex-core -- --exact…
 
 
-› Ask Codex to do anything
+› 让 Codex 做任何事
 
-  ? for shortcuts            100% context left
+  ? 查看快捷键            100% 剩余上下文

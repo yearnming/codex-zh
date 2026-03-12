@@ -46,17 +46,16 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
 }
 
 fn resume_metadata_error(path: &Path) -> String {
@@ -90,15 +89,15 @@ pub enum SessionPickerAction {
 impl SessionPickerAction {
     fn title(self) -> &'static str {
         match self {
-            SessionPickerAction::Resume => "Resume a previous session",
-            SessionPickerAction::Fork => "Fork a previous session",
+            SessionPickerAction::Resume => t("Resume a previous session", "恢复之前的会话"),
+            SessionPickerAction::Fork => t("Fork a previous session", "分叉之前的会话"),
         }
     }
 
     fn action_label(self) -> &'static str {
         match self {
-            SessionPickerAction::Resume => "resume",
-            SessionPickerAction::Fork => "fork",
+            SessionPickerAction::Resume => t("resume", "恢复"),
+            SessionPickerAction::Fork => t("fork", "分叉"),
         }
     }
 
@@ -257,8 +256,8 @@ async fn run_session_picker(
 /// Returns the human-readable column header for the given sort key.
 fn sort_key_label(sort_key: ThreadSortKey) -> &'static str {
     match sort_key {
-        ThreadSortKey::CreatedAt => "Created at",
-        ThreadSortKey::UpdatedAt => "Updated at",
+        ThreadSortKey::CreatedAt => t("Created at", "创建时间"),
+        ThreadSortKey::UpdatedAt => t("Updated at", "更新时间"),
     }
 }
 
@@ -905,7 +904,7 @@ fn draw_picker(tui: &mut Tui, state: &PickerState) -> std::io::Result<()> {
         let header_line: Line = vec![
             state.action.title().bold().cyan(),
             "  ".into(),
-            "Sort:".dim(),
+            t("Sort:", "排序：").dim(),
             " ".into(),
             sort_key_label(state.sort_key).magenta(),
         ]
@@ -923,23 +922,28 @@ fn draw_picker(tui: &mut Tui, state: &PickerState) -> std::io::Result<()> {
 
         // Hint line
         let action_label = state.action.action_label();
+        let action_hint = if is_zh_locale() {
+            format!(" {action_label} ")
+        } else {
+            format!(" to {action_label} ")
+        };
         let hint_line: Line = vec![
             key_hint::plain(KeyCode::Enter).into(),
-            format!(" to {action_label} ").dim(),
+            action_hint.dim(),
             "    ".dim(),
             key_hint::plain(KeyCode::Esc).into(),
-            " to start new ".dim(),
+            t(" to start new ", " 开始新会话 ").dim(),
             "    ".dim(),
             key_hint::ctrl(KeyCode::Char('c')).into(),
-            " to quit ".dim(),
+            t(" to quit ", " 退出 ").dim(),
             "    ".dim(),
             key_hint::plain(KeyCode::Tab).into(),
-            " to toggle sort ".dim(),
+            t(" to toggle sort ", " 切换排序 ").dim(),
             "    ".dim(),
             key_hint::plain(KeyCode::Up).into(),
             "/".dim(),
             key_hint::plain(KeyCode::Down).into(),
-            " to browse".dim(),
+            t(" to browse", " 浏览").dim(),
         ]
         .into();
         frame.render_widget_ref(hint_line, hint);
@@ -951,9 +955,9 @@ fn search_line(state: &PickerState) -> Line<'_> {
         return Line::from(error.red());
     }
     if state.query.is_empty() {
-        return Line::from("Type to search".dim());
+        return Line::from(t("Type to search", "输入以搜索").dim());
     }
-    Line::from(format!("Search: {}", state.query))
+    Line::from(format!("{}{}", t("Search: ", "搜索："), state.query))
 }
 
 fn render_list(
@@ -1083,7 +1087,13 @@ fn render_list(
     }
 
     if state.pagination.loading.is_pending() && y < area.y.saturating_add(area.height) {
-        let loading_line: Line = vec!["  ".into(), "Loading older sessions…".italic().dim()].into();
+        let loading_line: Line = vec![
+            "  ".into(),
+            t("Loading older sessions…", "正在加载更早的会话…")
+                .italic()
+                .dim(),
+        ]
+        .into();
         let rect = Rect::new(area.x, y, area.width, 1);
         frame.render_widget_ref(loading_line, rect);
     }
@@ -1094,34 +1104,65 @@ fn render_empty_state_line(state: &PickerState) -> Line<'static> {
         if state.search_state.is_active()
             || (state.pagination.loading.is_pending() && state.pagination.next_cursor.is_some())
         {
-            return vec!["Searching…".italic().dim()].into();
+            return vec![t("Searching…", "正在搜索…").italic().dim()].into();
         }
         if state.pagination.reached_scan_cap {
-            let msg = format!(
-                "Search scanned first {} sessions; more may exist",
-                state.pagination.num_scanned_files
-            );
+            let msg = if is_zh_locale() {
+                format!(
+                    "已扫描前 {} 个会话，可能还有更多",
+                    state.pagination.num_scanned_files
+                )
+            } else {
+                format!(
+                    "Search scanned first {} sessions; more may exist",
+                    state.pagination.num_scanned_files
+                )
+            };
             return vec![Span::from(msg).italic().dim()].into();
         }
-        return vec!["No results for your search".italic().dim()].into();
+        return vec![
+            t("No results for your search", "未找到匹配的搜索结果")
+                .italic()
+                .dim(),
+        ]
+        .into();
     }
 
     if state.all_rows.is_empty() && state.pagination.num_scanned_files == 0 {
-        return vec!["No sessions yet".italic().dim()].into();
+        return vec![t("No sessions yet", "暂无会话").italic().dim()].into();
     }
 
     if state.pagination.loading.is_pending() {
-        return vec!["Loading older sessions…".italic().dim()].into();
+        return vec![
+            t("Loading older sessions…", "正在加载更早的会话…")
+                .italic()
+                .dim(),
+        ]
+        .into();
     }
 
-    vec!["No sessions yet".italic().dim()].into()
+    vec![t("No sessions yet", "暂无会话").italic().dim()].into()
 }
 
 fn human_time_ago(ts: DateTime<Utc>) -> String {
     let now = Utc::now();
     let delta = now - ts;
     let secs = delta.num_seconds();
-    if secs < 60 {
+    if is_zh_locale() {
+        if secs < 60 {
+            let n = secs.max(0);
+            format!("{n} 秒前")
+        } else if secs < 60 * 60 {
+            let m = secs / 60;
+            format!("{m} 分钟前")
+        } else if secs < 60 * 60 * 24 {
+            let h = secs / 3600;
+            format!("{h} 小时前")
+        } else {
+            let d = secs / (60 * 60 * 24);
+            format!("{d} 天前")
+        }
+    } else if secs < 60 {
         let n = secs.max(0);
         if n == 1 {
             format!("{n} second ago")
@@ -1182,7 +1223,7 @@ fn render_column_headers(
     if visibility.show_created {
         let label = format!(
             "{text:<width$}",
-            text = "Created at",
+            text = t("Created at", "创建时间"),
             width = metrics.max_created_width
         );
         spans.push(Span::from(label).bold());
@@ -1191,7 +1232,7 @@ fn render_column_headers(
     if visibility.show_updated {
         let label = format!(
             "{text:<width$}",
-            text = "Updated at",
+            text = t("Updated at", "更新时间"),
             width = metrics.max_updated_width
         );
         spans.push(Span::from(label).bold());
@@ -1200,7 +1241,7 @@ fn render_column_headers(
     if visibility.show_branch {
         let label = format!(
             "{text:<width$}",
-            text = "Branch",
+            text = t("Branch", "分支"),
             width = metrics.max_branch_width
         );
         spans.push(Span::from(label).bold());
@@ -1209,13 +1250,13 @@ fn render_column_headers(
     if visibility.show_cwd {
         let label = format!(
             "{text:<width$}",
-            text = "CWD",
+            text = t("CWD", "工作目录"),
             width = metrics.max_cwd_width
         );
         spans.push(Span::from(label).bold());
         spans.push("  ".into());
     }
-    spans.push("Conversation".bold());
+    spans.push(t("Conversation", "会话").bold());
     frame.render_widget_ref(Line::from(spans), area);
 }
 
@@ -1266,11 +1307,11 @@ fn calculate_column_metrics(rows: &[Row], include_cwd: bool) -> ColumnMetrics {
     }
 
     let mut labels: Vec<(String, String, String, String)> = Vec::with_capacity(rows.len());
-    let mut max_created_width = UnicodeWidthStr::width("Created at");
-    let mut max_updated_width = UnicodeWidthStr::width("Updated at");
-    let mut max_branch_width = UnicodeWidthStr::width("Branch");
+    let mut max_created_width = UnicodeWidthStr::width(t("Created at", "创建时间"));
+    let mut max_updated_width = UnicodeWidthStr::width(t("Updated at", "更新时间"));
+    let mut max_branch_width = UnicodeWidthStr::width(t("Branch", "分支"));
     let mut max_cwd_width = if include_cwd {
-        UnicodeWidthStr::width("CWD")
+        UnicodeWidthStr::width(t("CWD", "工作目录"))
     } else {
         0
     };
@@ -1674,9 +1715,7 @@ mod tests {
             None,
             SessionPickerAction::Resume,
         );
-        state.inline_error = Some(String::from(
-            "Failed to read session metadata from /tmp/missing.jsonl",
-        ));
+        state.inline_error = Some(resume_metadata_error(Path::new("/tmp/missing.jsonl")));
 
         let width: u16 = 80;
         let height: u16 = 1;
@@ -2224,9 +2263,7 @@ mod tests {
         assert!(selection.is_none());
         assert_eq!(
             state.inline_error,
-            Some(String::from(
-                "Failed to read session metadata from /tmp/missing.jsonl"
-            ))
+            Some(resume_metadata_error(Path::new("/tmp/missing.jsonl")))
         );
     }
 

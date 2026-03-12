@@ -16,10 +16,58 @@ use chrono::Utc;
 use codex_protocol::protocol::CreditsSnapshot as CoreCreditsSnapshot;
 use codex_protocol::protocol::RateLimitSnapshot;
 use codex_protocol::protocol::RateLimitWindow;
+use std::env;
 
 const STATUS_LIMIT_BAR_SEGMENTS: usize = 20;
 const STATUS_LIMIT_BAR_FILLED: &str = "█";
 const STATUS_LIMIT_BAR_EMPTY: &str = "░";
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
+
+fn localize_limit_window(label: &str) -> String {
+    if !is_zh_locale() {
+        return capitalize_first(label);
+    }
+
+    let lowered = label.trim().to_ascii_lowercase();
+    if lowered == "weekly" {
+        return "每周".to_string();
+    }
+    if lowered == "daily" {
+        return "每天".to_string();
+    }
+    if lowered == "monthly" {
+        return "每月".to_string();
+    }
+    if let Some(value) = lowered.strip_suffix('h')
+        && !value.is_empty()
+        && value.chars().all(|ch| ch.is_ascii_digit())
+    {
+        return format!("{value}小时");
+    }
+    if let Some(value) = lowered.strip_suffix('m')
+        && !value.is_empty()
+        && value.chars().all(|ch| ch.is_ascii_digit())
+    {
+        return format!("{value}分钟");
+    }
+
+    label.to_string()
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct StatusRateLimitRow {
@@ -182,49 +230,54 @@ pub(crate) fn compose_rate_limit_data_many(
 
         let limit_bucket_label = snapshot.limit_name.clone();
         let show_limit_prefix = !limit_bucket_label.eq_ignore_ascii_case("codex");
-        let primary_label = snapshot
-            .primary
-            .as_ref()
-            .map(|window| {
-                window
-                    .window_minutes
-                    .map(get_limits_duration)
-                    .unwrap_or_else(|| "5h".to_string())
-            })
-            .map(|label| capitalize_first(&label));
-        let secondary_label = snapshot
-            .secondary
-            .as_ref()
-            .map(|window| {
-                window
-                    .window_minutes
-                    .map(get_limits_duration)
-                    .unwrap_or_else(|| "weekly".to_string())
-            })
-            .map(|label| capitalize_first(&label));
+        let primary_label = snapshot.primary.as_ref().map(|window| {
+            let label = window
+                .window_minutes
+                .map(get_limits_duration)
+                .unwrap_or_else(|| "5h".to_string());
+            localize_limit_window(&label)
+        });
+        let secondary_label = snapshot.secondary.as_ref().map(|window| {
+            let label = window
+                .window_minutes
+                .map(get_limits_duration)
+                .unwrap_or_else(|| "weekly".to_string());
+            localize_limit_window(&label)
+        });
         let window_count =
             usize::from(snapshot.primary.is_some()) + usize::from(snapshot.secondary.is_some());
         let combine_non_codex_single_limit = show_limit_prefix && window_count == 1;
 
         if show_limit_prefix && !combine_non_codex_single_limit {
             rows.push(StatusRateLimitRow {
-                label: format!("{limit_bucket_label} limit"),
+                label: if is_zh_locale() {
+                    format!("{limit_bucket_label} 限额")
+                } else {
+                    format!("{limit_bucket_label} limit")
+                },
                 value: StatusRateLimitValue::Text(String::new()),
             });
         }
 
         if let Some(primary) = snapshot.primary.as_ref() {
             let label = if combine_non_codex_single_limit {
-                format!(
-                    "{} {} limit",
-                    limit_bucket_label,
-                    primary_label.clone().unwrap_or_else(|| "5h".to_string())
-                )
+                let suffix = primary_label
+                    .clone()
+                    .unwrap_or_else(|| localize_limit_window("5h"));
+                if is_zh_locale() {
+                    format!("{limit_bucket_label} {suffix} 限额")
+                } else {
+                    format!("{limit_bucket_label} {suffix} limit")
+                }
             } else {
-                format!(
-                    "{} limit",
-                    primary_label.clone().unwrap_or_else(|| "5h".to_string())
-                )
+                let suffix = primary_label
+                    .clone()
+                    .unwrap_or_else(|| localize_limit_window("5h"));
+                if is_zh_locale() {
+                    format!("{suffix} 限额")
+                } else {
+                    format!("{suffix} limit")
+                }
             };
             rows.push(StatusRateLimitRow {
                 label,
@@ -237,20 +290,23 @@ pub(crate) fn compose_rate_limit_data_many(
 
         if let Some(secondary) = snapshot.secondary.as_ref() {
             let label = if combine_non_codex_single_limit {
-                format!(
-                    "{} {} limit",
-                    limit_bucket_label,
-                    secondary_label
-                        .clone()
-                        .unwrap_or_else(|| "weekly".to_string())
-                )
+                let suffix = secondary_label
+                    .clone()
+                    .unwrap_or_else(|| localize_limit_window("weekly"));
+                if is_zh_locale() {
+                    format!("{limit_bucket_label} {suffix} 限额")
+                } else {
+                    format!("{limit_bucket_label} {suffix} limit")
+                }
             } else {
-                format!(
-                    "{} limit",
-                    secondary_label
-                        .clone()
-                        .unwrap_or_else(|| "weekly".to_string())
-                )
+                let suffix = secondary_label
+                    .clone()
+                    .unwrap_or_else(|| localize_limit_window("weekly"));
+                if is_zh_locale() {
+                    format!("{suffix} 限额")
+                } else {
+                    format!("{suffix} limit")
+                }
             };
             rows.push(StatusRateLimitRow {
                 label,
@@ -295,7 +351,11 @@ pub(crate) fn render_status_limit_progress_bar(percent_remaining: f64) -> String
 
 /// Formats a compact textual summary from remaining percentage.
 pub(crate) fn format_status_limit_summary(percent_remaining: f64) -> String {
-    format!("{percent_remaining:.0}% left")
+    if is_zh_locale() {
+        format!("剩余 {percent_remaining:.0}%")
+    } else {
+        format!("{percent_remaining:.0}% left")
+    }
 }
 
 /// Builds a single `StatusRateLimitRow` for credits when the snapshot indicates
@@ -308,15 +368,19 @@ fn credit_status_row(credits: &CreditsSnapshotDisplay) -> Option<StatusRateLimit
     }
     if credits.unlimited {
         return Some(StatusRateLimitRow {
-            label: "Credits".to_string(),
-            value: StatusRateLimitValue::Text("Unlimited".to_string()),
+            label: t("Credits", "额度").to_string(),
+            value: StatusRateLimitValue::Text(t("Unlimited", "无限").to_string()),
         });
     }
     let balance = credits.balance.as_ref()?;
     let display_balance = format_credit_balance(balance)?;
     Some(StatusRateLimitRow {
-        label: "Credits".to_string(),
-        value: StatusRateLimitValue::Text(format!("{display_balance} credits")),
+        label: t("Credits", "额度").to_string(),
+        value: StatusRateLimitValue::Text(if is_zh_locale() {
+            format!("{display_balance} 额度")
+        } else {
+            format!("{display_balance} credits")
+        }),
     })
 }
 
@@ -395,13 +459,13 @@ mod tests {
         assert_eq!(
             labels,
             vec![
-                "5h limit".to_string(),
-                "Credits".to_string(),
-                "codex-other 5h limit".to_string(),
-                "Credits".to_string(),
+                "5小时 限额".to_string(),
+                "额度".to_string(),
+                "codex-other 5小时 限额".to_string(),
+                "额度".to_string(),
             ]
         );
-        assert_eq!(rows.iter().filter(|row| row.label == "Credits").count(), 2);
+        assert_eq!(rows.iter().filter(|row| row.label == "额度").count(), 2);
     }
 
     #[test]
@@ -431,9 +495,9 @@ mod tests {
         assert_eq!(
             labels,
             vec![
-                "codex-other limit".to_string(),
-                "1h limit".to_string(),
-                "Weekly limit".to_string(),
+                "codex-other 限额".to_string(),
+                "1小时 限额".to_string(),
+                "每周 限额".to_string(),
             ]
         );
     }

@@ -42,7 +42,11 @@ pub(crate) fn spawn_agent(
         } = match server.start_thread(config).await {
             Ok(v) => v,
             Err(err) => {
-                let message = format!("Failed to initialize codex: {err}");
+                let message = if crate::is_zh_locale() {
+                    format!("初始化 Codex 失败：{err}")
+                } else {
+                    format!("Failed to initialize codex: {err}")
+                };
                 tracing::error!("{message}");
                 app_event_tx_clone.send(AppEvent::CodexEvent(Event {
                     id: "".to_string(),

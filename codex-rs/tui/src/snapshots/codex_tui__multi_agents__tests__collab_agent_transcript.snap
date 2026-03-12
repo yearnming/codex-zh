@@ -2,16 +2,16 @@
 source: tui/src/multi_agents.rs
 expression: snapshot
 ---
-• Spawned Robie [explorer]
+• 已创建 Robie [explorer]
   └ Compute 11! and reply with just the integer result.
 
-• Sent input to Robie [explorer]
-  └ Please continue and return the answer only.
+• 已发送给 Robie [explorer]
+  └ 请继续并只返回答案。
 
-• Waiting for Robie [explorer]
+• 等待 Robie [explorer]
 
-• Finished waiting
+• 等待结束
   └ Robie [explorer]: Completed - 39916800
     Bob [worker]: Error - tool timeout
 
-• Closed Robie [explorer]
+• 已关闭 Robie [explorer]

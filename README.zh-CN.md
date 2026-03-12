@@ -17,8 +17,8 @@
 - 详细流程见项目方案文档。
 
 ## 语言切换
-当前支持通过环境变量启用中文错误提示，并输出中文帮助摘要：
-- `CODEX_LOCALE=zh-CN`
-- 或设置系统语言为中文（`LANG/LC_ALL/LC_MESSAGES` 含 `zh`）
-启用后执行 `codex --help` 会显示中文帮助摘要（子命令帮助仍为英文）。
-已提供部分子命令中文摘要：`login`、`exec`、`review`、`mcp`、`sandbox`、`resume`、`fork`、`completion`、`apply`、`cloud`、`debug`。
+默认启用中文。需要英文时，请使用：
+- `codex --lang en`
+- `codex --locale en`
+执行 `codex --help` 会显示中文帮助摘要。
+已提供子命令中文摘要：`login`、`logout`、`exec`、`review`、`mcp`、`mcp-server`、`app-server`、`sandbox`、`resume`、`fork`、`completion`、`apply`、`cloud`、`debug`、`features`。

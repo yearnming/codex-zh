@@ -5,8 +5,8 @@ expression: "format!(\"{buf:?}\")"
 Buffer {
     area: Rect { x: 0, y: 0, width: 48, height: 6 },
     content: [
-        "• Messages to be submitted after next tool call ",
-        "  (press esc to interrupt and send immediately) ",
+        "• 将在下一次工具调用后提交的消息 ",
+        "  （按 esc 中断并立即发送）             ",
         "  ↳ First line                                  ",
         "    Second line                                 ",
         "    Third line                                  ",

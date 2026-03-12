@@ -1,28 +1,25 @@
 use super::*;
-use std::env;
 use codex_protocol::protocol::ConversationStartParams;
 use codex_protocol::protocol::RealtimeAudioFrame;
 use codex_protocol::protocol::RealtimeConversationClosedEvent;
 use codex_protocol::protocol::RealtimeConversationRealtimeEvent;
 use codex_protocol::protocol::RealtimeConversationStartedEvent;
 use codex_protocol::protocol::RealtimeEvent;
+use std::env;
 
-const REALTIME_CONVERSATION_PROMPT: &str = "You are in a realtime voice conversation in the Codex TUI. Respond conversationally and concisely.";
+const REALTIME_CONVERSATION_PROMPT_EN: &str = "You are in a realtime voice conversation in the Codex TUI. Respond conversationally and concisely.";
+const REALTIME_CONVERSATION_PROMPT_ZH: &str =
+    "你正在 Codex TUI 中进行实时语音对话。请用对话式、简洁的方式回答。";
 
 fn normalize_locale(value: &str) -> String {
     value.replace('_', "-").replace('.', "-").to_lowercase()
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }
@@ -43,6 +40,7 @@ fn realtime_voice_closed(reason: &str) -> String {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn realtime_mic_start_error(err: &str) -> String {
     if is_zh_locale() {
         format!("启动麦克风采集失败：{err}")
@@ -51,6 +49,7 @@ fn realtime_mic_start_error(err: &str) -> String {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn realtime_speaker_start_error(err: &str) -> String {
     if is_zh_locale() {
         format!("启动扬声器输出失败：{err}")
@@ -254,7 +253,12 @@ impl ChatWidget {
         self.realtime_conversation.warned_audio_only_submission = false;
         self.set_footer_hint_override(Some(Self::realtime_footer_hint_items()));
         self.submit_op(Op::RealtimeConversationStart(ConversationStartParams {
-            prompt: REALTIME_CONVERSATION_PROMPT.to_string(),
+            prompt: if is_zh_locale() {
+                REALTIME_CONVERSATION_PROMPT_ZH
+            } else {
+                REALTIME_CONVERSATION_PROMPT_EN
+            }
+            .to_string(),
             session_id: None,
         }));
         self.request_redraw();

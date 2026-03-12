@@ -204,7 +204,11 @@ impl WidgetRef for SkillPopup {
             &rows,
             &self.state,
             MAX_POPUP_ROWS,
-            "no matches",
+            if crate::is_zh_locale() {
+                "没有匹配结果"
+            } else {
+                "no matches"
+            },
         );
         if let Some(hint_area) = hint_area {
             let hint_area = Rect {
@@ -220,10 +224,22 @@ impl WidgetRef for SkillPopup {
 
 fn skill_popup_hint_line() -> Line<'static> {
     Line::from(vec![
-        "Press ".into(),
+        if crate::is_zh_locale() {
+            "按 ".into()
+        } else {
+            "Press ".into()
+        },
         key_hint::plain(KeyCode::Enter).into(),
-        " to insert or ".into(),
+        if crate::is_zh_locale() {
+            " 插入或按 ".into()
+        } else {
+            " to insert or ".into()
+        },
         key_hint::plain(KeyCode::Esc).into(),
-        " to close".into(),
+        if crate::is_zh_locale() {
+            " 关闭".into()
+        } else {
+            " to close".into()
+        },
     ])
 }

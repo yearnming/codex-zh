@@ -40,15 +40,10 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }
@@ -70,26 +65,47 @@ pub enum TrustDirectorySelection {
 impl WidgetRef for &TrustDirectoryWidget {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let mut column = ColumnRenderable::new();
+        let is_zh = is_zh_locale();
+        let header_prefix = if is_zh {
+            "当前目录："
+        } else {
+            "You are in "
+        };
+        let trust_prompt = if is_zh {
+            "是否信任此目录的内容？处理不受信任的内容会带来更高的提示注入风险。"
+        } else {
+            "Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection."
+        };
+        let option_yes = if is_zh {
+            "是，继续"
+        } else {
+            "Yes, continue"
+        };
+        let option_no = if is_zh { "否，退出" } else { "No, quit" };
+        let hint_continue = if is_zh { " 继续" } else { " to continue" };
+        let hint_continue_with_sandbox = if is_zh {
+            " 继续并创建沙箱..."
+        } else {
+            " to continue and create a sandbox..."
+        };
 
         column.push(Line::from(vec![
             "> ".into(),
-            "You are in ".bold(),
+            header_prefix.bold(),
             self.cwd.to_string_lossy().to_string().into(),
         ]));
         column.push("");
 
         column.push(
-            Paragraph::new(
-                "Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt injection.".to_string(),
-            )
+            Paragraph::new(trust_prompt.to_string())
                 .wrap(Wrap { trim: true })
                 .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.push("");
 
         let options: Vec<(&str, TrustDirectorySelection)> = vec![
-            ("Yes, continue", TrustDirectorySelection::Trust),
-            ("No, quit", TrustDirectorySelection::Quit),
+            (option_yes, TrustDirectorySelection::Trust),
+            (option_no, TrustDirectorySelection::Quit),
         ];
 
         for (idx, (text, selection)) in options.iter().enumerate() {
@@ -114,12 +130,12 @@ impl WidgetRef for &TrustDirectoryWidget {
 
         column.push(
             Line::from(vec![
-                "Press ".dim(),
+                if is_zh { "按 " } else { "Press " }.dim(),
                 key_hint::plain(KeyCode::Enter).into(),
                 if self.show_windows_create_sandbox_hint {
-                    " to continue and create a sandbox...".dim()
+                    hint_continue_with_sandbox.dim()
                 } else {
-                    " to continue".dim()
+                    hint_continue.dim()
                 },
             ])
             .inset(Insets::tlbr(0, 2, 0, 0)),

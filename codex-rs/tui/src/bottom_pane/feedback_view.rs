@@ -34,6 +34,10 @@ const BASE_CLI_BUG_ISSUE_URL: &str =
 /// Internal routing link for employee feedback follow-ups. This must not be shown to external users.
 const CODEX_FEEDBACK_INTERNAL_URL: &str = "http://go/codex-feedback-internal";
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 /// The target audience for feedback follow-up instructions.
 ///
 /// This is used strictly for messaging/links after feedback upload completes. It
@@ -110,18 +114,37 @@ impl FeedbackNoteView {
         match result {
             Ok(()) => {
                 let prefix = if self.include_logs {
-                    "• Feedback uploaded."
+                    t("• Feedback uploaded.", "• 已上传反馈。")
                 } else {
-                    "• Feedback recorded (no logs)."
+                    t(
+                        "• Feedback recorded (no logs).",
+                        "• 已记录反馈（未上传日志）。",
+                    )
                 };
                 let issue_url =
                     issue_url_for_category(self.category, &thread_id, self.feedback_audience);
                 let mut lines = vec![Line::from(match issue_url.as_ref() {
                     Some(_) if self.feedback_audience == FeedbackAudience::OpenAiEmployee => {
-                        format!("{prefix} Please report this in #codex-feedback:")
+                        if crate::is_zh_locale() {
+                            format!("{prefix} 请在 #codex-feedback 报告：")
+                        } else {
+                            format!("{prefix} Please report this in #codex-feedback:")
+                        }
                     }
-                    Some(_) => format!("{prefix} Please open an issue using the following URL:"),
-                    None => format!("{prefix} Thanks for the feedback!"),
+                    Some(_) => {
+                        if crate::is_zh_locale() {
+                            format!("{prefix} 请使用以下链接提交 issue：")
+                        } else {
+                            format!("{prefix} Please open an issue using the following URL:")
+                        }
+                    }
+                    None => {
+                        if crate::is_zh_locale() {
+                            format!("{prefix} 感谢反馈！")
+                        } else {
+                            format!("{prefix} Thanks for the feedback!")
+                        }
+                    }
                 })];
                 match issue_url {
                     Some(url) if self.feedback_audience == FeedbackAudience::OpenAiEmployee => {
@@ -129,7 +152,10 @@ impl FeedbackNoteView {
                             "".into(),
                             Line::from(vec!["  ".into(), url.cyan().underlined()]),
                             "".into(),
-                            Line::from("  Share this and add some info about your problem:"),
+                            Line::from(t(
+                                "  Share this and add some info about your problem:",
+                                "  分享此链接并补充问题信息：",
+                            )),
                             Line::from(vec![
                                 "    ".into(),
                                 format!("https://go/codex-feedback/{thread_id}").bold(),
@@ -142,9 +168,13 @@ impl FeedbackNoteView {
                             Line::from(vec!["  ".into(), url.cyan().underlined()]),
                             "".into(),
                             Line::from(vec![
-                                "  Or mention your thread ID ".into(),
+                                t(
+                                    "  Or mention your thread ID ",
+                                    "  或在已有 issue 中提及你的 thread ID ",
+                                )
+                                .into(),
                                 std::mem::take(&mut thread_id).bold(),
-                                " in an existing issue.".into(),
+                                t(" in an existing issue.", "。").into(),
                             ]),
                         ]);
                     }
@@ -152,7 +182,7 @@ impl FeedbackNoteView {
                         lines.extend([
                             "".into(),
                             Line::from(vec![
-                                "  Thread ID: ".into(),
+                                t("  Thread ID: ", "  Thread ID：").into(),
                                 std::mem::take(&mut thread_id).bold(),
                             ]),
                         ]);
@@ -365,24 +395,44 @@ fn gutter() -> Span<'static> {
 fn feedback_title_and_placeholder(category: FeedbackCategory) -> (String, String) {
     match category {
         FeedbackCategory::BadResult => (
-            "Tell us more (bad result)".to_string(),
-            "(optional) Write a short description to help us further".to_string(),
+            t("Tell us more (bad result)", "补充说明（效果不佳）").to_string(),
+            t(
+                "(optional) Write a short description to help us further",
+                "（可选）写一段简短描述以便我们进一步了解",
+            )
+            .to_string(),
         ),
         FeedbackCategory::GoodResult => (
-            "Tell us more (good result)".to_string(),
-            "(optional) Write a short description to help us further".to_string(),
+            t("Tell us more (good result)", "补充说明（效果很好）").to_string(),
+            t(
+                "(optional) Write a short description to help us further",
+                "（可选）写一段简短描述以便我们进一步了解",
+            )
+            .to_string(),
         ),
         FeedbackCategory::Bug => (
-            "Tell us more (bug)".to_string(),
-            "(optional) Write a short description to help us further".to_string(),
+            t("Tell us more (bug)", "补充说明（故障）").to_string(),
+            t(
+                "(optional) Write a short description to help us further",
+                "（可选）写一段简短描述以便我们进一步了解",
+            )
+            .to_string(),
         ),
         FeedbackCategory::SafetyCheck => (
-            "Tell us more (safety check)".to_string(),
-            "(optional) Share what was refused and why it should have been allowed".to_string(),
+            t("Tell us more (safety check)", "补充说明（安全检查）").to_string(),
+            t(
+                "(optional) Share what was refused and why it should have been allowed",
+                "（可选）说明被拒绝的内容以及为何应该允许",
+            )
+            .to_string(),
         ),
         FeedbackCategory::Other => (
-            "Tell us more (other)".to_string(),
-            "(optional) Write a short description to help us further".to_string(),
+            t("Tell us more (other)", "补充说明（其他）").to_string(),
+            t(
+                "(optional) Write a short description to help us further",
+                "（可选）写一段简短描述以便我们进一步了解",
+            )
+            .to_string(),
         ),
     }
 }
@@ -432,36 +482,51 @@ pub(crate) fn feedback_selection_params(
     app_event_tx: AppEventSender,
 ) -> super::SelectionViewParams {
     super::SelectionViewParams {
-        title: Some("How was this?".to_string()),
+        title: Some(t("How was this?", "体验如何？").to_string()),
         items: vec![
             make_feedback_item(
                 app_event_tx.clone(),
-                "bug",
-                "Crash, error message, hang, or broken UI/behavior.",
+                t("bug", "故障"),
+                t(
+                    "Crash, error message, hang, or broken UI/behavior.",
+                    "崩溃、错误提示、卡住或 UI/行为异常。",
+                ),
                 FeedbackCategory::Bug,
             ),
             make_feedback_item(
                 app_event_tx.clone(),
-                "bad result",
-                "Output was off-target, incorrect, incomplete, or unhelpful.",
+                t("bad result", "效果不佳"),
+                t(
+                    "Output was off-target, incorrect, incomplete, or unhelpful.",
+                    "输出偏题、错误、不完整或没有帮助。",
+                ),
                 FeedbackCategory::BadResult,
             ),
             make_feedback_item(
                 app_event_tx.clone(),
-                "good result",
-                "Helpful, correct, high‑quality, or delightful result worth celebrating.",
+                t("good result", "效果很好"),
+                t(
+                    "Helpful, correct, high‑quality, or delightful result worth celebrating.",
+                    "有帮助、正确、高质量或令人满意的结果。",
+                ),
                 FeedbackCategory::GoodResult,
             ),
             make_feedback_item(
                 app_event_tx.clone(),
-                "safety check",
-                "Benign usage blocked due to safety checks or refusals.",
+                t("safety check", "安全检查"),
+                t(
+                    "Benign usage blocked due to safety checks or refusals.",
+                    "正常使用因安全检查或拒绝而被阻止。",
+                ),
                 FeedbackCategory::SafetyCheck,
             ),
             make_feedback_item(
                 app_event_tx,
-                "other",
-                "Slowness, feature suggestion, UX feedback, or anything else.",
+                t("other", "其他"),
+                t(
+                    "Slowness, feature suggestion, UX feedback, or anything else.",
+                    "缓慢、功能建议、体验反馈或其他问题。",
+                ),
                 FeedbackCategory::Other,
             ),
         ],
@@ -472,11 +537,17 @@ pub(crate) fn feedback_selection_params(
 /// Build the selection popup params shown when feedback is disabled.
 pub(crate) fn feedback_disabled_params() -> super::SelectionViewParams {
     super::SelectionViewParams {
-        title: Some("Sending feedback is disabled".to_string()),
-        subtitle: Some("This action is disabled by configuration.".to_string()),
+        title: Some(t("Sending feedback is disabled", "反馈发送已被禁用").to_string()),
+        subtitle: Some(
+            t(
+                "This action is disabled by configuration.",
+                "此操作已被配置禁用。",
+            )
+            .to_string(),
+        ),
         footer_hint: Some(standard_popup_hint_line()),
         items: vec![super::SelectionItem {
-            name: "Close".to_string(),
+            name: t("Close", "关闭").to_string(),
             dismiss_on_select: true,
             ..Default::default()
         }],
@@ -534,9 +605,9 @@ pub(crate) fn feedback_upload_consent_params(
 
     // Build header listing files that would be sent if user consents.
     let mut header_lines: Vec<Box<dyn crate::render::renderable::Renderable>> = vec![
-        Line::from("Upload logs?".bold()).into(),
+        Line::from(t("Upload logs?", "上传日志？").bold()).into(),
         Line::from("").into(),
-        Line::from("The following files will be sent:".dim()).into(),
+        Line::from(t("The following files will be sent:", "将发送以下文件：").dim()).into(),
         Line::from(vec!["  • ".into(), "codex-logs.log".into()]).into(),
     ];
     if let Some(path) = rollout_path.as_deref()
@@ -555,7 +626,7 @@ pub(crate) fn feedback_upload_consent_params(
     }
     if should_show_feedback_connectivity_details(category, feedback_diagnostics) {
         header_lines.push(Line::from("").into());
-        header_lines.push(Line::from("Connectivity diagnostics".bold()).into());
+        header_lines.push(Line::from(t("Connectivity diagnostics", "连接诊断").bold()).into());
         for diagnostic in feedback_diagnostics.diagnostics() {
             header_lines
                 .push(Line::from(vec!["  - ".into(), diagnostic.headline.clone().into()]).into());
@@ -569,17 +640,20 @@ pub(crate) fn feedback_upload_consent_params(
         footer_hint: Some(standard_popup_hint_line()),
         items: vec![
             super::SelectionItem {
-                name: "Yes".to_string(),
+                name: t("Yes", "是").to_string(),
                 description: Some(
-                    "Share the current Codex session logs with the team for troubleshooting."
-                        .to_string(),
+                    t(
+                        "Share the current Codex session logs with the team for troubleshooting.",
+                        "分享当前 Codex 会话日志以便排查问题。",
+                    )
+                    .to_string(),
                 ),
                 actions: vec![yes_action],
                 dismiss_on_select: true,
                 ..Default::default()
             },
             super::SelectionItem {
-                name: "No".to_string(),
+                name: t("No", "否").to_string(),
                 actions: vec![no_action],
                 dismiss_on_select: true,
                 ..Default::default()

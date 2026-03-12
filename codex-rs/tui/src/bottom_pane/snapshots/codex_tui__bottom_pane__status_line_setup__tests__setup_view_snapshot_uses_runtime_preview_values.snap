@@ -4,19 +4,19 @@ assertion_line: 365
 expression: "render_lines(&view, 72)"
 ---
                                                                         
-  Configure Status Line                                                 
-  Select which items to display in the status line.                     
+  配置状态栏                                                              
+  选择要显示在状态栏中的项目。                                            
                                                                         
-  Type to search                                                        
+  输入以搜索                                                              
   >                                                                     
-› [x] model-name            Current model name                          
-  [x] current-dir           Current working directory                   
-  [x] git-branch            Current Git branch (omitted when unavaila…  
-  [ ] model-with-reasoning  Current model name with reasoning level     
-  [ ] project-root          Project root directory (omitted when unav…  
-  [ ] context-remaining     Percentage of context window remaining (o…  
-  [ ] context-used          Percentage of context window used (omitte…  
-  [ ] five-hour-limit       Remaining usage on 5-hour usage limit (om…  
+› [x] model-name            当前模型名称                                 
+  [x] current-dir           当前工作目录                                 
+  [x] git-branch            当前 Git 分支（不可用时隐藏）                
+  [ ] model-with-reasoning  包含推理等级的当前模型名称                   
+  [ ] project-root          项目根目录（不可用时隐藏）                   
+  [ ] context-remaining     剩余上下文窗口百分比（未知时隐藏）           
+  [ ] context-used          已用上下文窗口百分比（未知时隐藏）           
+  [ ] five-hour-limit       5 小时用量剩余（不可用时隐藏）               
                                                                         
   gpt-5-codex · ~/codex-rs · jif/statusline-preview                     
-  Use ↑↓ to navigate, ←→ to move, space to select, enter to confirm, esc
+  使用 ↑↓ 导航，←→ 移动，空格选择，回车确认，Esc 取消。

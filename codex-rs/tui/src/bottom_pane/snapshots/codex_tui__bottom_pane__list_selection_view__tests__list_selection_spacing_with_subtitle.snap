@@ -3,10 +3,10 @@ source: tui/src/bottom_pane/list_selection_view.rs
 expression: render_lines(&view)
 ---
                                                 
-  Select Approval Mode                          
-  Switch between Codex approval presets         
+  选择审批模式                          
+  在 Codex 审批预设之间切换         
                                                 
-› 1. Read Only (current)  Codex can read files  
-  2. Full Access          Codex can edit files  
+› 1. 只读（当前）         Codex 可读取文件  
+  2. 完全访问             Codex 可编辑文件  
                                                 
-  Press enter to confirm or esc to go back
+  按 Enter 确认或按 Esc 返回

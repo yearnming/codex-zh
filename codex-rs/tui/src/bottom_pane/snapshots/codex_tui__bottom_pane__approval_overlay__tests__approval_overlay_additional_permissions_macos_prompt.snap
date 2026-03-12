@@ -3,16 +3,16 @@ source: tui/src/bottom_pane/approval_overlay.rs
 expression: "render_overlay_lines(&view, 120)"
 ---
 
-  Would you like to run the following command?
+  是否执行以下命令？
 
-  Reason: need macOS automation
+  原因：need macOS automation
 
-  Permission rule: macOS preferences readwrite; macOS automation com.apple.Calendar, com.apple.Notes; macOS
-  accessibility; macOS calendar
+  权限规则：macOS 偏好设置 读写; macOS 自动化 com.apple.Calendar, com.apple.Notes; macOS 辅助功能; macOS
+  日历
 
   $ osascript -e 'tell application'
 
-› 1. Yes, proceed (y)
-  2. No, and tell Codex what to do differently (esc)
+› 1. 是，继续 (y)
+  2. 否，并告诉 Codex 该如何处理 (esc)
 
-  Press enter to confirm or esc to cancel
+  按 enter 确认或按 esc 取消

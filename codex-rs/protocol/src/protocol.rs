@@ -1887,30 +1887,61 @@ impl From<TokenUsage> for FinalOutput {
 impl fmt::Display for FinalOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let token_usage = &self.token_usage;
+        let locale = std::env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+        let is_zh = locale
+            .map(|value| value.replace('_', "-").replace('.', "-").to_lowercase())
+            .map(|value| value.starts_with("zh"))
+            .unwrap_or(true);
 
-        write!(
-            f,
-            "Token usage: total={} input={}{} output={}{}",
-            format_with_separators(token_usage.blended_total()),
-            format_with_separators(token_usage.non_cached_input()),
-            if token_usage.cached_input() > 0 {
-                format!(
-                    " (+ {} cached)",
-                    format_with_separators(token_usage.cached_input())
-                )
-            } else {
-                String::new()
-            },
-            format_with_separators(token_usage.output_tokens),
-            if token_usage.reasoning_output_tokens > 0 {
-                format!(
-                    " (reasoning {})",
-                    format_with_separators(token_usage.reasoning_output_tokens)
-                )
-            } else {
-                String::new()
-            }
-        )
+        if is_zh {
+            write!(
+                f,
+                "Token 用量：总计={} 输入={}{} 输出={}{}",
+                format_with_separators(token_usage.blended_total()),
+                format_with_separators(token_usage.non_cached_input()),
+                if token_usage.cached_input() > 0 {
+                    format!(
+                        "（含缓存 {}）",
+                        format_with_separators(token_usage.cached_input())
+                    )
+                } else {
+                    String::new()
+                },
+                format_with_separators(token_usage.output_tokens),
+                if token_usage.reasoning_output_tokens > 0 {
+                    format!(
+                        "（推理 {}）",
+                        format_with_separators(token_usage.reasoning_output_tokens)
+                    )
+                } else {
+                    String::new()
+                }
+            )
+        } else {
+            write!(
+                f,
+                "Token usage: total={} input={}{} output={}{}",
+                format_with_separators(token_usage.blended_total()),
+                format_with_separators(token_usage.non_cached_input()),
+                if token_usage.cached_input() > 0 {
+                    format!(
+                        " (+ {} cached)",
+                        format_with_separators(token_usage.cached_input())
+                    )
+                } else {
+                    String::new()
+                },
+                format_with_separators(token_usage.output_tokens),
+                if token_usage.reasoning_output_tokens > 0 {
+                    format!(
+                        " (reasoning {})",
+                        format_with_separators(token_usage.reasoning_output_tokens)
+                    )
+                } else {
+                    String::new()
+                }
+            )
+        }
     }
 }
 

@@ -121,6 +121,38 @@ use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::unbounded_channel;
 use toml::Value as TomlValue;
 
+fn waiting_for_background_terminal_header() -> &'static str {
+    if crate::is_zh_locale() {
+        "等待后台终端"
+    } else {
+        "Waiting for background terminal"
+    }
+}
+
+fn plan_implementation_title() -> &'static str {
+    if crate::is_zh_locale() {
+        "实现这个计划？"
+    } else {
+        "Implement this plan?"
+    }
+}
+
+fn plan_implementation_coding_message() -> &'static str {
+    if crate::is_zh_locale() {
+        "执行该计划。"
+    } else {
+        "Implement the plan."
+    }
+}
+
+fn plan_mode_reasoning_scope_title() -> &'static str {
+    if crate::is_zh_locale() {
+        "应用推理调整"
+    } else {
+        "Apply reasoning change"
+    }
+}
+
 async fn test_config() -> Config {
     // Use base defaults to avoid depending on host state.
     let codex_home = std::env::temp_dir();
@@ -563,7 +595,11 @@ async fn forked_thread_history_line_includes_name_and_id_snapshot() {
     let combined = lines_to_single_string(&history_cell.display_lines(80));
 
     assert!(
-        combined.contains("Thread forked from"),
+        combined.contains(if crate::is_zh_locale() {
+            "线程派生自"
+        } else {
+            "Thread forked from"
+        }),
         "expected forked thread message in history"
     );
     assert_snapshot!("forked_thread_history_line", combined);
@@ -946,8 +982,17 @@ async fn enter_with_only_remote_images_does_not_submit_when_input_disabled() {
 
     let remote_url = "https://example.com/remote-only.png".to_string();
     chat.set_remote_image_urls(vec![remote_url.clone()]);
-    chat.bottom_pane
-        .set_composer_input_enabled(false, Some("Input disabled for test.".to_string()));
+    chat.bottom_pane.set_composer_input_enabled(
+        false,
+        Some(
+            if crate::is_zh_locale() {
+                "测试用：输入已禁用。"
+            } else {
+                "Input disabled for test."
+            }
+            .to_string(),
+        ),
+    );
 
     chat.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
@@ -1473,7 +1518,14 @@ async fn entered_review_mode_uses_request_hint() {
 
     let cells = drain_insert_history(&mut rx);
     let banner = lines_to_single_string(cells.last().expect("review banner"));
-    assert_eq!(banner, ">> Code review started: feature branch <<\n");
+    assert_eq!(
+        banner,
+        if crate::is_zh_locale() {
+            ">> 代码审查开始：feature branch <<\n"
+        } else {
+            ">> Code review started: feature branch <<\n"
+        }
+    );
     assert!(chat.is_review_mode);
 }
 
@@ -1492,7 +1544,14 @@ async fn entered_review_mode_defaults_to_current_changes_banner() {
 
     let cells = drain_insert_history(&mut rx);
     let banner = lines_to_single_string(cells.last().expect("review banner"));
-    assert_eq!(banner, ">> Code review started: current changes <<\n");
+    assert_eq!(
+        banner,
+        if crate::is_zh_locale() {
+            ">> 代码审查开始：current changes <<\n"
+        } else {
+            ">> Code review started: current changes <<\n"
+        }
+    );
     assert!(chat.is_review_mode);
 }
 
@@ -1787,7 +1846,7 @@ async fn make_chatwidget_manual(
         frame_requester: FrameRequester::test_dummy(),
         has_input_focus: true,
         enhanced_keys_supported: false,
-        placeholder_text: "Ask Codex to do anything".to_string(),
+        placeholder_text: crate::ui_consts::default_composer_placeholder().to_string(),
         disable_paste_burst: false,
         animations_enabled: cfg.animations,
         skills: None,
@@ -1855,7 +1914,7 @@ async fn make_chatwidget_manual(
         interrupts: InterruptManager::new(),
         reasoning_buffer: String::new(),
         full_reasoning_buffer: String::new(),
-        current_status_header: String::from("Working"),
+        current_status_header: default_status_header(),
         retry_status_header: None,
         pending_status_indicator_restore: false,
         suppress_queue_autosend: false,
@@ -2044,20 +2103,25 @@ async fn rate_limit_warnings_emit_thresholds() {
 
     assert_eq!(
         warnings,
-        vec![
-            String::from(
+        if crate::is_zh_locale() {
+            vec![
+                "提示：你的 5小时 限额剩余不足 25%。运行 /status 查看详情。".to_string(),
+                "提示：你的 每周 限额剩余不足 25%。运行 /status 查看详情。".to_string(),
+                "提示：你的 5小时 限额剩余不足 5%。运行 /status 查看详情。".to_string(),
+                "提示：你的 每周 限额剩余不足 5%。运行 /status 查看详情。".to_string(),
+            ]
+        } else {
+            vec![
                 "Heads up, you have less than 25% of your 5h limit left. Run /status for a breakdown."
-            ),
-            String::from(
-                "Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown.",
-            ),
-            String::from(
+                    .to_string(),
+                "Heads up, you have less than 25% of your weekly limit left. Run /status for a breakdown."
+                    .to_string(),
                 "Heads up, you have less than 5% of your 5h limit left. Run /status for a breakdown."
-            ),
-            String::from(
-                "Heads up, you have less than 5% of your weekly limit left. Run /status for a breakdown.",
-            ),
-        ],
+                    .to_string(),
+                "Heads up, you have less than 5% of your weekly limit left. Run /status for a breakdown."
+                    .to_string(),
+            ]
+        },
         "expected one warning per limit for the highest crossed threshold"
     );
 }
@@ -2070,9 +2134,14 @@ async fn test_rate_limit_warnings_monthly() {
     warnings.extend(state.take_warnings(Some(75.0), Some(43199), None, None));
     assert_eq!(
         warnings,
-        vec![String::from(
-            "Heads up, you have less than 25% of your monthly limit left. Run /status for a breakdown.",
-        ),],
+        if crate::is_zh_locale() {
+            vec!["提示：你的 每月 限额剩余不足 25%。运行 /status 查看详情。".to_string()]
+        } else {
+            vec![
+                "Heads up, you have less than 25% of your monthly limit left. Run /status for a breakdown."
+                    .to_string(),
+            ]
+        },
         "expected one warning per limit for the highest crossed threshold"
     );
 }
@@ -2392,7 +2461,7 @@ async fn plan_implementation_popup_yes_emits_submit_message_event() {
     else {
         panic!("expected SubmitUserMessageWithMode, got {event:?}");
     };
-    assert_eq!(text, PLAN_IMPLEMENTATION_CODING_MESSAGE);
+    assert_eq!(text, plan_implementation_coding_message());
     assert_eq!(collaboration_mode.mode, Some(ModeKind::Default));
 }
 
@@ -2404,7 +2473,10 @@ async fn submit_user_message_with_mode_sets_coding_collaboration_mode() {
 
     let default_mode = collaboration_modes::default_mode_mask(chat.models_manager.as_ref())
         .expect("expected default collaboration mode");
-    chat.submit_user_message_with_mode("Implement the plan.".to_string(), default_mode);
+    chat.submit_user_message_with_mode(
+        plan_implementation_coding_message().to_string(),
+        default_mode,
+    );
 
     match next_submit_op(&mut op_rx) {
         Op::UserTurn {
@@ -2530,9 +2602,17 @@ async fn plan_mode_reasoning_override_is_marked_current_in_reasoning_popup() {
     chat.open_reasoning_popup(preset);
 
     let popup = render_bottom_popup(&chat, 100);
-    assert!(popup.contains("Low (current)"));
+    assert!(popup.contains(if crate::is_zh_locale() {
+        "低（当前）"
+    } else {
+        "Low (current)"
+    }));
     assert!(
-        !popup.contains("High (current)"),
+        !popup.contains(if crate::is_zh_locale() {
+            "高（当前）"
+        } else {
+            "High (current)"
+        }),
         "expected Plan override to drive current reasoning label, got: {popup}"
     );
 }
@@ -2607,7 +2687,7 @@ async fn plan_reasoning_scope_popup_all_modes_persists_global_and_plan_override(
 #[test]
 fn plan_mode_prompt_notification_uses_dedicated_type_name() {
     let notification = Notification::PlanModePrompt {
-        title: PLAN_IMPLEMENTATION_TITLE.to_string(),
+        title: plan_implementation_title().to_string(),
     };
 
     assert!(notification.allowed_for(&Notifications::Custom(
@@ -2616,10 +2696,12 @@ fn plan_mode_prompt_notification_uses_dedicated_type_name() {
     assert!(!notification.allowed_for(&Notifications::Custom(vec![
         "approval-requested".to_string(),
     ])));
-    assert_eq!(
-        notification.display(),
-        format!("Plan mode prompt: {PLAN_IMPLEMENTATION_TITLE}")
-    );
+    let expected = if crate::is_zh_locale() {
+        format!("计划模式提示：{}", plan_implementation_title())
+    } else {
+        format!("Plan mode prompt: {}", plan_implementation_title())
+    };
+    assert_eq!(notification.display(), expected);
 }
 
 #[test]
@@ -2635,10 +2717,12 @@ fn user_input_requested_notification_uses_dedicated_type_name() {
     assert!(!notification.allowed_for(&Notifications::Custom(vec![
         "approval-requested".to_string(),
     ])));
-    assert_eq!(
-        notification.display(),
+    let expected = if crate::is_zh_locale() {
+        "请求提问：Reasoning scope"
+    } else {
         "Question requested: Reasoning scope"
-    );
+    };
+    assert_eq!(notification.display(), expected);
 }
 
 #[tokio::test]
@@ -2650,7 +2734,7 @@ async fn open_plan_implementation_prompt_sets_pending_notification() {
 
     assert_matches!(
         chat.pending_notification,
-        Some(Notification::PlanModePrompt { ref title }) if title == PLAN_IMPLEMENTATION_TITLE
+        Some(Notification::PlanModePrompt { ref title }) if title == plan_implementation_title()
     );
 }
 
@@ -2666,7 +2750,7 @@ async fn open_plan_reasoning_scope_prompt_sets_pending_notification() {
 
     assert_matches!(
         chat.pending_notification,
-        Some(Notification::PlanModePrompt { ref title }) if title == PLAN_MODE_REASONING_SCOPE_TITLE
+        Some(Notification::PlanModePrompt { ref title }) if title == plan_mode_reasoning_scope_title()
     );
 }
 
@@ -2681,7 +2765,7 @@ async fn agent_turn_complete_does_not_override_pending_plan_mode_prompt_notifica
 
     assert_matches!(
         chat.pending_notification,
-        Some(Notification::PlanModePrompt { ref title }) if title == PLAN_IMPLEMENTATION_TITLE
+        Some(Notification::PlanModePrompt { ref title }) if title == plan_implementation_title()
     );
 }
 
@@ -2877,7 +2961,10 @@ async fn submit_user_message_with_mode_submits_when_plan_stream_is_not_active() 
     let expected_mode = default_mode
         .mode
         .expect("expected default collaboration mode kind");
-    chat.submit_user_message_with_mode("Implement the plan.".to_string(), default_mode);
+    chat.submit_user_message_with_mode(
+        plan_implementation_coding_message().to_string(),
+        default_mode,
+    );
 
     assert_eq!(chat.active_collaboration_mode_kind(), expected_mode);
     assert!(chat.queued_user_messages.is_empty());
@@ -2909,7 +2996,7 @@ async fn plan_implementation_popup_skips_replayed_turn_complete() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        !popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !popup.contains(plan_implementation_title()),
         "expected no plan popup for replayed turn, got {popup:?}"
     );
 }
@@ -2933,7 +3020,7 @@ async fn plan_implementation_popup_shows_once_when_replay_precedes_live_turn_com
     })]);
     let replay_popup = render_bottom_popup(&chat, 80);
     assert!(
-        !replay_popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !replay_popup.contains(plan_implementation_title()),
         "expected no prompt for replayed turn completion, got {replay_popup:?}"
     );
 
@@ -2947,14 +3034,14 @@ async fn plan_implementation_popup_shows_once_when_replay_precedes_live_turn_com
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        popup.contains(plan_implementation_title()),
         "expected prompt for first live turn completion after replay, got {popup:?}"
     );
 
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     let dismissed_popup = render_bottom_popup(&chat, 80);
     assert!(
-        !dismissed_popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !dismissed_popup.contains(plan_implementation_title()),
         "expected prompt to dismiss on Esc, got {dismissed_popup:?}"
     );
 
@@ -2967,7 +3054,7 @@ async fn plan_implementation_popup_shows_once_when_replay_precedes_live_turn_com
     });
     let duplicate_popup = render_bottom_popup(&chat, 80);
     assert!(
-        !duplicate_popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !duplicate_popup.contains(plan_implementation_title()),
         "expected no prompt for duplicate live completion, got {duplicate_popup:?}"
     );
 }
@@ -3007,7 +3094,7 @@ async fn plan_implementation_popup_skips_when_messages_queued() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        !popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !popup.contains(plan_implementation_title()),
         "expected no plan popup with queued messages, got {popup:?}"
     );
 }
@@ -3033,7 +3120,7 @@ async fn plan_implementation_popup_skips_without_proposed_plan() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        !popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !popup.contains(plan_implementation_title()),
         "expected no plan popup without proposed plan output, got {popup:?}"
     );
 }
@@ -3054,7 +3141,7 @@ async fn plan_implementation_popup_shows_after_proposed_plan_output() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        popup.contains(plan_implementation_title()),
         "expected plan popup after proposed plan output, got {popup:?}"
     );
 }
@@ -3096,7 +3183,7 @@ async fn plan_implementation_popup_skips_when_steer_follows_proposed_plan() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        !popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !popup.contains(plan_implementation_title()),
         "expected no plan popup after a steer follows the plan, got {popup:?}"
     );
 }
@@ -3142,7 +3229,7 @@ async fn plan_implementation_popup_shows_after_new_plan_follows_steer() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        popup.contains(plan_implementation_title()),
         "expected plan popup after a newer plan follows the steer, got {popup:?}"
     );
 }
@@ -3176,7 +3263,7 @@ async fn plan_implementation_popup_skips_when_rate_limit_prompt_pending() {
         "expected rate limit popup, got {popup:?}"
     );
     assert!(
-        !popup.contains(PLAN_IMPLEMENTATION_TITLE),
+        !popup.contains(plan_implementation_title()),
         "expected plan popup to be skipped, got {popup:?}"
     );
 }
@@ -4734,7 +4821,7 @@ async fn exec_history_cell_shows_working_then_completed() {
     let blob = lines_to_single_string(lines);
     // New behavior: no glyph markers; ensure command is shown and no panic.
     assert!(
-        blob.contains("• Ran"),
+        blob.contains("• 已运行"),
         "expected summary header present: {blob:?}"
     );
     assert!(
@@ -4761,7 +4848,7 @@ async fn exec_history_cell_shows_working_then_failed() {
     let lines = &cells[0];
     let blob = lines_to_single_string(lines);
     assert!(
-        blob.contains("• Ran false"),
+        blob.contains("• 已运行 false"),
         "expected command and header text present: {blob:?}"
     );
     assert!(blob.to_lowercase().contains("bloop"), "expected error text");
@@ -4802,7 +4889,7 @@ async fn exec_end_without_begin_uses_event_command() {
     assert_eq!(cells.len(), 1, "expected finalized exec cell to flush");
     let blob = lines_to_single_string(&cells[0]);
     assert!(
-        blob.contains("• Ran echo orphaned"),
+        blob.contains("• 已运行 echo orphaned"),
         "expected command text to come from event: {blob:?}"
     );
     assert!(
@@ -4830,7 +4917,7 @@ async fn exec_end_without_begin_does_not_flush_unrelated_running_exploring_cell(
     assert_eq!(cells.len(), 1, "only the orphan end should be inserted");
     let orphan_blob = lines_to_single_string(&cells[0]);
     assert!(
-        orphan_blob.contains("• Ran echo repro-marker"),
+        orphan_blob.contains("• 已运行 echo repro-marker"),
         "expected orphan end to render a standalone entry: {orphan_blob:?}"
     );
     let active = active_blob(&chat);
@@ -4878,7 +4965,7 @@ async fn exec_end_without_begin_flushes_completed_unrelated_exploring_cell() {
         "expected flushed exploring cell: {first:?}"
     );
     assert!(
-        second.contains("• Ran echo after"),
+        second.contains("• 已运行 echo after"),
         "expected orphan end entry after flush: {second:?}"
     );
     assert!(
@@ -4941,7 +5028,7 @@ async fn exec_history_shows_unified_exec_startup_commands() {
     assert_eq!(cells.len(), 1, "expected finalized exec cell to flush");
     let blob = lines_to_single_string(&cells[0]);
     assert!(
-        blob.contains("• Ran echo unified exec startup"),
+        blob.contains("• 已运行 echo unified exec startup"),
         "expected startup command to render: {blob:?}"
     );
 }
@@ -5123,15 +5210,12 @@ async fn unified_exec_wait_status_header_updates_on_late_command_display() {
     });
 
     assert!(chat.active_cell.is_none());
-    assert_eq!(
-        chat.current_status_header,
-        "Waiting for background terminal"
-    );
+    assert_eq!(chat.current_status_header, "等待后台终端");
     let status = chat
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Waiting for background terminal");
+    assert_eq!(status.header(), waiting_for_background_terminal_header());
     assert_eq!(status.details(), Some("sleep 5"));
 }
 
@@ -5145,13 +5229,13 @@ async fn unified_exec_waiting_multiple_empty_snapshots() {
     terminal_interaction(&mut chat, "call-wait-1b", "proc-1", "");
     assert_eq!(
         chat.current_status_header,
-        "Waiting for background terminal"
+        waiting_for_background_terminal_header()
     );
     let status = chat
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Waiting for background terminal");
+    assert_eq!(status.header(), waiting_for_background_terminal_header());
     assert_eq!(status.details(), Some("just fix"));
 
     chat.handle_codex_event(Event {
@@ -5217,13 +5301,13 @@ async fn unified_exec_non_empty_then_empty_snapshots() {
     terminal_interaction(&mut chat, "call-wait-3b", "proc-3", "");
     assert_eq!(
         chat.current_status_header,
-        "Waiting for background terminal"
+        waiting_for_background_terminal_header()
     );
     let status = chat
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Waiting for background terminal");
+    assert_eq!(status.header(), waiting_for_background_terminal_header());
     assert_eq!(status.details(), Some("just fix"));
     let pre_cells = drain_insert_history(&mut rx);
     let active_combined = pre_cells
@@ -5351,8 +5435,13 @@ async fn mode_switch_surfaces_model_change_notification_when_effective_model_cha
         .map(|lines| lines_to_single_string(lines))
         .collect::<Vec<_>>()
         .join("\n");
+    let expected_plan_message = if crate::is_zh_locale() {
+        "模型已切换为 gpt-5.1-codex-mini 中，用于 计划模式。".to_string()
+    } else {
+        "Model changed to gpt-5.1-codex-mini medium for Plan mode.".to_string()
+    };
     assert!(
-        plan_messages.contains("Model changed to gpt-5.1-codex-mini medium for Plan mode."),
+        plan_messages.contains(&expected_plan_message),
         "expected Plan-mode model switch notice, got: {plan_messages:?}"
     );
 
@@ -5365,8 +5454,11 @@ async fn mode_switch_surfaces_model_change_notification_when_effective_model_cha
         .map(|lines| lines_to_single_string(lines))
         .collect::<Vec<_>>()
         .join("\n");
-    let expected_default_message =
-        format!("Model changed to {default_model} default for Default mode.");
+    let expected_default_message = if crate::is_zh_locale() {
+        format!("模型已切换为 {default_model} 默认，用于 默认模式。")
+    } else {
+        format!("Model changed to {default_model} default for Default mode.")
+    };
     assert!(
         default_messages.contains(&expected_default_message),
         "expected Default-mode model switch notice, got: {default_messages:?}"
@@ -5388,8 +5480,13 @@ async fn mode_switch_surfaces_reasoning_change_notification_when_model_stays_sam
         .map(|lines| lines_to_single_string(lines))
         .collect::<Vec<_>>()
         .join("\n");
+    let expected_plan_message = if crate::is_zh_locale() {
+        "模型已切换为 gpt-5.3-codex 中，用于 计划模式。".to_string()
+    } else {
+        "Model changed to gpt-5.3-codex medium for Plan mode.".to_string()
+    };
     assert!(
-        plan_messages.contains("Model changed to gpt-5.3-codex medium for Plan mode."),
+        plan_messages.contains(&expected_plan_message),
         "expected reasoning-change notice in Plan mode, got: {plan_messages:?}"
     );
 }
@@ -5403,7 +5500,7 @@ async fn collab_slash_command_opens_picker_and_updates_mode() {
     chat.dispatch_command(SlashCommand::Collab);
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Select Collaboration Mode"),
+        popup.contains("选择协作模式"),
         "expected collaboration picker: {popup}"
     );
 
@@ -5798,9 +5895,11 @@ async fn slash_copy_reports_when_no_copyable_output_exists() {
     let rendered = lines_to_single_string(&cells[0]);
     assert_snapshot!("slash_copy_no_output_info_message", rendered);
     assert!(
-        rendered.contains(
+        rendered.contains(if crate::is_zh_locale() {
+            "`/copy` 在首次 Codex 输出前或回滚后不可用。"
+        } else {
             "`/copy` is unavailable before the first Codex output or right after a rollback."
-        ),
+        }),
         "expected no-output message, got {rendered:?}"
     );
 }
@@ -5870,9 +5969,11 @@ async fn slash_copy_is_unavailable_when_legacy_agent_message_is_not_repeated_on_
     assert_eq!(cells.len(), 1, "expected one info message");
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains(
+        rendered.contains(if crate::is_zh_locale() {
+            "`/copy` 在首次 Codex 输出前或回滚后不可用。"
+        } else {
             "`/copy` is unavailable before the first Codex output or right after a rollback."
-        ),
+        }),
         "expected unavailable message, got {rendered:?}"
     );
 }
@@ -5899,9 +6000,11 @@ async fn slash_copy_is_unavailable_when_legacy_agent_message_item_is_not_repeate
     assert_eq!(cells.len(), 1, "expected one info message");
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains(
+        rendered.contains(if crate::is_zh_locale() {
+            "`/copy` 在首次 Codex 输出前或回滚后不可用。"
+        } else {
             "`/copy` is unavailable before the first Codex output or right after a rollback."
-        ),
+        }),
         "expected unavailable message, got {rendered:?}"
     );
 }
@@ -5931,9 +6034,11 @@ async fn slash_copy_does_not_return_stale_output_after_thread_rollback() {
     assert_eq!(cells.len(), 1, "expected one info message");
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains(
+        rendered.contains(if crate::is_zh_locale() {
+            "`/copy` 在首次 Codex 输出前或回滚后不可用。"
+        } else {
             "`/copy` is unavailable before the first Codex output or right after a rollback."
-        ),
+        }),
         "expected rollback-cleared copy state message, got {rendered:?}"
     );
 }
@@ -5958,7 +6063,7 @@ async fn slash_clean_submits_background_terminal_cleanup() {
     assert_eq!(cells.len(), 1, "expected cleanup confirmation message");
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains("Stopping all background terminals."),
+        rendered.contains("正在停止所有后台终端。"),
         "expected cleanup confirmation, got {rendered:?}"
     );
 }
@@ -6414,7 +6519,11 @@ async fn review_custom_prompt_escape_navigates_back_then_dismisses() {
     // Verify child view is on top.
     let header = render_bottom_first_row(&chat, 60);
     assert!(
-        header.contains("Custom review instructions"),
+        header.contains(if crate::is_zh_locale() {
+            "自定义审核说明"
+        } else {
+            "Custom review instructions"
+        }),
         "expected custom prompt view header: {header:?}"
     );
 
@@ -6422,7 +6531,11 @@ async fn review_custom_prompt_escape_navigates_back_then_dismisses() {
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     let header = render_bottom_first_row(&chat, 60);
     assert!(
-        header.contains("Select a review preset"),
+        header.contains(if crate::is_zh_locale() {
+            "选择审核预设"
+        } else {
+            "Select a review preset"
+        }),
         "expected to return to parent review popup: {header:?}"
     );
 
@@ -6450,7 +6563,11 @@ async fn review_branch_picker_escape_navigates_back_then_dismisses() {
     // Verify child view header.
     let header = render_bottom_first_row(&chat, 60);
     assert!(
-        header.contains("Select a base branch"),
+        header.contains(if crate::is_zh_locale() {
+            "选择基准分支"
+        } else {
+            "Select a base branch"
+        }),
         "expected branch picker header: {header:?}"
     );
 
@@ -6458,7 +6575,11 @@ async fn review_branch_picker_escape_navigates_back_then_dismisses() {
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     let header = render_bottom_first_row(&chat, 60);
     assert!(
-        header.contains("Select a review preset"),
+        header.contains(if crate::is_zh_locale() {
+            "选择审核预设"
+        } else {
+            "Select a review preset"
+        }),
         "expected to return to parent review popup: {header:?}"
     );
 
@@ -6563,7 +6684,11 @@ async fn apps_popup_stays_loading_until_final_snapshot_updates() {
 
     let before = render_bottom_popup(&chat, 80);
     assert!(
-        before.contains("Loading installed and available apps..."),
+        before.contains(if crate::is_zh_locale() {
+            "正在加载已安装和可用的应用..."
+        } else {
+            "Loading installed and available apps..."
+        }),
         "expected /apps to stay in the loading state until the full list arrives, got:\n{before}"
     );
     assert_snapshot!("apps_popup_loading_state", before);
@@ -6608,7 +6733,11 @@ async fn apps_popup_stays_loading_until_final_snapshot_updates() {
 
     let after = render_bottom_popup(&chat, 80);
     assert!(
-        after.contains("Installed 2 of 2 available apps."),
+        after.contains(if crate::is_zh_locale() {
+            "已安装 2 / 2 个可用应用。"
+        } else {
+            "Installed 2 of 2 available apps."
+        }),
         "expected refreshed apps popup snapshot, got:\n{after}"
     );
     assert!(
@@ -6688,7 +6817,14 @@ async fn apps_refresh_failure_keeps_existing_full_snapshot() {
         }),
         false,
     );
-    chat.on_connectors_loaded(Err("failed to load apps".to_string()), true);
+    chat.on_connectors_loaded(
+        Err(if crate::is_zh_locale() {
+            "加载应用失败".to_string()
+        } else {
+            "failed to load apps".to_string()
+        }),
+        true,
+    );
 
     assert_matches!(
         &chat.connectors_cache,
@@ -6698,7 +6834,11 @@ async fn apps_refresh_failure_keeps_existing_full_snapshot() {
     chat.add_connectors_output();
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Installed 1 of 2 available apps."),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装 1 / 2 个可用应用。"
+        } else {
+            "Installed 1 of 2 available apps."
+        }),
         "expected previous full snapshot to be preserved, got:\n{popup}"
     );
 }
@@ -6854,7 +6994,14 @@ async fn apps_refresh_failure_with_cached_snapshot_triggers_pending_force_refetc
         connectors: full_connectors.clone(),
     });
 
-    chat.on_connectors_loaded(Err("failed to load apps".to_string()), true);
+    chat.on_connectors_loaded(
+        Err(if crate::is_zh_locale() {
+            "加载应用失败".to_string()
+        } else {
+            "failed to load apps".to_string()
+        }),
+        true,
+    );
 
     assert!(chat.connectors_prefetch_in_flight);
     assert!(!chat.connectors_force_refetch_pending);
@@ -6959,7 +7106,11 @@ async fn apps_popup_keeps_existing_full_snapshot_while_partial_refresh_loads() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Installed 1 of 2 available apps."),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装 1 / 2 个可用应用。"
+        } else {
+            "Installed 1 of 2 available apps."
+        }),
         "expected popup to keep the last full snapshot while partial refresh loads, got:\n{popup}"
     );
     assert!(
@@ -7002,11 +7153,18 @@ async fn apps_refresh_failure_without_full_snapshot_falls_back_to_installed_apps
     chat.add_connectors_output();
     let loading_popup = render_bottom_popup(&chat, 80);
     assert!(
-        loading_popup.contains("Loading installed and available apps..."),
+        loading_popup.contains("正在加载已安装和可用的应用..."),
         "expected /apps to keep showing loading before the final result, got:\n{loading_popup}"
     );
 
-    chat.on_connectors_loaded(Err("failed to load apps".to_string()), true);
+    chat.on_connectors_loaded(
+        Err(if crate::is_zh_locale() {
+            "加载应用失败".to_string()
+        } else {
+            "failed to load apps".to_string()
+        }),
+        true,
+    );
 
     assert_matches!(
         &chat.connectors_cache,
@@ -7015,11 +7173,19 @@ async fn apps_refresh_failure_without_full_snapshot_falls_back_to_installed_apps
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Installed 1 of 1 available apps."),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装 1 / 1 个可用应用。"
+        } else {
+            "Installed 1 of 1 available apps."
+        }),
         "expected /apps to fall back to the installed apps snapshot, got:\n{popup}"
     );
     assert!(
-        popup.contains("Installed. Press Enter to open the app page"),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装。按回车打开应用页面"
+        } else {
+            "Installed. Press Enter to open the app page"
+        }),
         "expected the fallback popup to behave like the installed apps view, got:\n{popup}"
     );
 }
@@ -7058,11 +7224,19 @@ async fn apps_popup_shows_disabled_status_for_installed_but_disabled_apps() {
     chat.add_connectors_output();
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Installed · Disabled. Press Enter to open the app page"),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装 · 已禁用。按回车打开应用页面"
+        } else {
+            "Installed · Disabled. Press Enter to open the app page"
+        }),
         "expected selected app description to include disabled status, got:\n{popup}"
     );
     assert!(
-        popup.contains("enable/disable this app."),
+        popup.contains(if crate::is_zh_locale() {
+            "启用/停用该应用"
+        } else {
+            "enable/disable this app."
+        }),
         "expected selected app description to mention enable/disable action, got:\n{popup}"
     );
 }
@@ -7187,7 +7361,11 @@ async fn apps_refresh_preserves_toggled_enabled_state() {
     chat.add_connectors_output();
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Installed · Disabled. Press Enter to open the app page"),
+        popup.contains(if crate::is_zh_locale() {
+            "已安装 · 已禁用。按回车打开应用页面"
+        } else {
+            "Installed · Disabled. Press Enter to open the app page"
+        }),
         "expected disabled status to persist after reload, got:\n{popup}"
     );
 }
@@ -7226,11 +7404,19 @@ async fn apps_popup_for_not_installed_app_uses_install_only_selected_description
     chat.add_connectors_output();
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Can be installed. Press Enter to open the app page to install"),
+        popup.contains(if crate::is_zh_locale() {
+            "可安装。按回车打开应用页面以安装"
+        } else {
+            "Can be installed. Press Enter to open the app page to install"
+        }),
         "expected selected app description to be install-only for not-installed apps, got:\n{popup}"
     );
     assert!(
-        !popup.contains("enable/disable this app."),
+        !popup.contains(if crate::is_zh_locale() {
+            "启用/停用该应用"
+        } else {
+            "enable/disable this app."
+        }),
         "did not expect enable/disable text for not-installed apps, got:\n{popup}"
     );
 }
@@ -7717,13 +7903,19 @@ async fn reasoning_popup_shows_extra_high_with_space() {
 
     let popup = render_bottom_popup(&chat, 120);
     assert!(
-        popup.contains("Extra high"),
-        "expected popup to include 'Extra high'; popup: {popup}"
+        popup.contains(if crate::is_zh_locale() {
+            "超高"
+        } else {
+            "Extra high"
+        }),
+        "expected popup to include extra-high label; popup: {popup}"
     );
-    assert!(
-        !popup.contains("Extrahigh"),
-        "expected popup not to include 'Extrahigh'; popup: {popup}"
-    );
+    if !crate::is_zh_locale() {
+        assert!(
+            !popup.contains("Extrahigh"),
+            "expected popup not to include 'Extrahigh'; popup: {popup}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -7753,7 +7945,11 @@ async fn single_reasoning_option_skips_selection() {
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        !popup.contains("Select Reasoning Level"),
+        !popup.contains(if crate::is_zh_locale() {
+            "选择推理强度"
+        } else {
+            "Select Reasoning Level"
+        }),
         "expected reasoning selection popup to be skipped"
     );
 
@@ -7831,13 +8027,25 @@ async fn reasoning_popup_escape_returns_to_model_popup() {
     chat.open_reasoning_popup(preset);
 
     let before_escape = render_bottom_popup(&chat, 80);
-    assert!(before_escape.contains("Select Reasoning Level"));
+    assert!(before_escape.contains(if crate::is_zh_locale() {
+        "选择推理强度"
+    } else {
+        "Select Reasoning Level"
+    }));
 
     chat.handle_key_event(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
 
     let after_escape = render_bottom_popup(&chat, 80);
-    assert!(after_escape.contains("Select Model"));
-    assert!(!after_escape.contains("Select Reasoning Level"));
+    assert!(after_escape.contains(if crate::is_zh_locale() {
+        "选择模型"
+    } else {
+        "Select Model"
+    }));
+    assert!(!after_escape.contains(if crate::is_zh_locale() {
+        "选择推理强度"
+    } else {
+        "Select Reasoning Level"
+    }));
 }
 
 #[tokio::test]
@@ -8064,7 +8272,7 @@ async fn approvals_popup_navigation_skips_disabled() {
         .expect("render approvals popup after disabled selection");
     let screen = terminal.backend().vt100().screen().contents();
     assert!(
-        screen.contains("Update Model Permissions"),
+        screen.contains("更新模型权限"),
         "popup should remain open after selecting a disabled entry"
     );
     assert!(
@@ -8125,7 +8333,7 @@ async fn permissions_selection_emits_history_cell_when_selection_changes() {
     );
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains("Permissions updated to"),
+        rendered.contains("权限已更新为"),
         "expected permissions selection history message, got: {rendered}"
     );
 }
@@ -8222,7 +8430,7 @@ async fn permissions_selection_emits_history_cell_when_current_is_selected() {
     );
     let rendered = lines_to_single_string(&cells[0]);
     assert!(
-        rendered.contains("Permissions updated to"),
+        rendered.contains("权限已更新为"),
         "expected permissions update history message, got: {rendered}"
     );
 }
@@ -8271,7 +8479,11 @@ async fn permissions_full_access_history_cell_emitted_only_after_confirmation() 
 
     let popup = render_bottom_popup(&chat, 80);
     assert!(
-        popup.contains("Enable full access?"),
+        popup.contains(if crate::is_zh_locale() {
+            "启用完全访问？"
+        } else {
+            "Enable full access?"
+        }),
         "expected full access confirmation popup, got: {popup}"
     );
 
@@ -8288,7 +8500,11 @@ async fn permissions_full_access_history_cell_emitted_only_after_confirmation() 
         lines_to_single_string(&cells_after_confirmation[0])
     };
     assert!(
-        rendered.contains("Permissions updated to Full Access"),
+        rendered.contains(if crate::is_zh_locale() {
+            "权限已更新为 Full Access"
+        } else {
+            "Permissions updated to Full Access"
+        }),
         "expected full access update history message, got: {rendered}"
     );
 }
@@ -9463,7 +9679,7 @@ async fn thread_snapshot_replayed_turn_started_marks_task_running() {
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Working");
+    assert_eq!(status.header(), default_status_header());
 }
 
 #[tokio::test]
@@ -9522,7 +9738,7 @@ async fn thread_snapshot_replayed_stream_recovery_restores_previous_status_heade
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Working");
+    assert_eq!(status.header(), default_status_header());
     assert_eq!(status.details(), None);
     assert!(chat.retry_status_header.is_none());
 }
@@ -9833,7 +10049,7 @@ async fn stream_recovery_restores_previous_status_header() {
         .bottom_pane
         .status_widget()
         .expect("status indicator should be visible");
-    assert_eq!(status.header(), "Working");
+    assert_eq!(status.header(), default_status_header());
     assert_eq!(status.details(), None);
     assert!(chat.retry_status_header.is_none());
 }
@@ -9850,10 +10066,15 @@ async fn runtime_metrics_websocket_timing_logs_and_final_separator_sums_totals()
         ..RuntimeMetricsSummary::default()
     });
 
+    let websocket_label = if crate::is_zh_locale() {
+        "WebSocket 时序："
+    } else {
+        "WebSocket timing:"
+    };
     let first_log = drain_insert_history(&mut rx)
         .iter()
         .map(|lines| lines_to_single_string(lines))
-        .find(|line| line.contains("WebSocket timing:"))
+        .find(|line| line.contains(websocket_label))
         .expect("expected websocket timing log");
     assert!(first_log.contains("TTFT: 120ms (iapi)"));
     assert!(first_log.contains("TBT: 50ms (service)"));
@@ -9866,7 +10087,7 @@ async fn runtime_metrics_websocket_timing_logs_and_final_separator_sums_totals()
     let second_log = drain_insert_history(&mut rx)
         .iter()
         .map(|lines| lines_to_single_string(lines))
-        .find(|line| line.contains("WebSocket timing:"))
+        .find(|line| line.contains(websocket_label))
         .expect("expected websocket timing log");
     assert!(second_log.contains("TTFT: 80ms (iapi)"));
 

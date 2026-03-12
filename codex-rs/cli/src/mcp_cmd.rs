@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -23,13 +24,29 @@ use codex_rmcp_client::perform_oauth_login;
 use codex_utils_cli::CliConfigOverrides;
 use codex_utils_cli::format_env_display::format_env_display;
 
-/// Subcommands:
-/// - `list`   — list configured servers (with `--json`)
-/// - `get`    — show a single server (with `--json`)
-/// - `add`    — add a server launcher entry to `~/.codex/config.toml`
-/// - `remove` — delete a server entry
-/// - `login`  — authenticate with MCP server using OAuth
-/// - `logout` — remove OAuth credentials for MCP server
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
+
+/// 子命令：
+/// - `list`   — 列出已配置的服务器（支持 `--json`）
+/// - `get`    — 显示单个服务器（支持 `--json`）
+/// - `add`    — 向 `~/.codex/config.toml` 添加服务器启动配置
+/// - `remove` — 删除服务器配置
+/// - `login`  — 使用 OAuth 登录 MCP 服务器
+/// - `logout` — 删除 MCP 服务器 OAuth 凭据
 #[derive(Debug, clap::Parser)]
 pub struct McpCli {
     #[clap(flatten)]
@@ -51,17 +68,17 @@ pub enum McpSubcommand {
 
 #[derive(Debug, clap::Parser)]
 pub struct ListArgs {
-    /// Output the configured servers as JSON.
+    /// 以 JSON 输出已配置的服务器。
     #[arg(long)]
     pub json: bool,
 }
 
 #[derive(Debug, clap::Parser)]
 pub struct GetArgs {
-    /// Name of the MCP server to display.
+    /// 要显示的 MCP 服务器名称。
     pub name: String,
 
-    /// Output the server configuration as JSON.
+    /// 以 JSON 输出服务器配置。
     #[arg(long)]
     pub json: bool,
 }
@@ -69,7 +86,7 @@ pub struct GetArgs {
 #[derive(Debug, clap::Parser)]
 #[command(override_usage = "codex mcp add [OPTIONS] <NAME> (--url <URL> | -- <COMMAND>...)")]
 pub struct AddArgs {
-    /// Name for the MCP server configuration.
+    /// MCP 服务器配置名称。
     pub name: String,
 
     #[command(flatten)]
@@ -95,16 +112,16 @@ pub struct AddMcpTransportArgs {
 
 #[derive(Debug, clap::Args)]
 pub struct AddMcpStdioArgs {
-    /// Command to launch the MCP server.
-    /// Use --url for a streamable HTTP server.
+    /// 用于启动 MCP 服务器的命令。
+    /// 若为 streamable HTTP 服务器，请使用 --url。
     #[arg(
             trailing_var_arg = true,
             num_args = 0..,
         )]
     pub command: Vec<String>,
 
-    /// Environment variables to set when launching the server.
-    /// Only valid with stdio servers.
+    /// 启动服务器时设置的环境变量。
+    /// 仅适用于 stdio 服务器。
     #[arg(
         long,
         value_parser = parse_env_pair,
@@ -115,12 +132,12 @@ pub struct AddMcpStdioArgs {
 
 #[derive(Debug, clap::Args)]
 pub struct AddMcpStreamableHttpArgs {
-    /// URL for a streamable HTTP MCP server.
+    /// streamable HTTP MCP 服务器的 URL。
     #[arg(long)]
     pub url: String,
 
-    /// Optional environment variable to read for a bearer token.
-    /// Only valid with streamable HTTP servers.
+    /// 用于读取 bearer token 的可选环境变量。
+    /// 仅适用于 streamable HTTP 服务器。
     #[arg(
         long = "bearer-token-env-var",
         value_name = "ENV_VAR",
@@ -131,23 +148,23 @@ pub struct AddMcpStreamableHttpArgs {
 
 #[derive(Debug, clap::Parser)]
 pub struct RemoveArgs {
-    /// Name of the MCP server configuration to remove.
+    /// 要移除的 MCP 服务器配置名称。
     pub name: String,
 }
 
 #[derive(Debug, clap::Parser)]
 pub struct LoginArgs {
-    /// Name of the MCP server to authenticate with oauth.
+    /// 要进行 OAuth 登录的 MCP 服务器名称。
     pub name: String,
 
-    /// Comma-separated list of OAuth scopes to request.
+    /// 以逗号分隔的 OAuth scope 列表。
     #[arg(long, value_delimiter = ',', value_name = "SCOPE,SCOPE")]
     pub scopes: Vec<String>,
 }
 
 #[derive(Debug, clap::Parser)]
 pub struct LogoutArgs {
-    /// Name of the MCP server to deauthenticate.
+    /// 要注销的 MCP 服务器名称。
     pub name: String,
 }
 
@@ -190,7 +207,7 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
         .map_err(anyhow::Error::msg)?;
     let config = Config::load_with_cli_overrides(overrides)
         .await
-        .context("failed to load configuration")?;
+        .with_context(|| t("failed to load configuration", "加载配置失败").to_string())?;
 
     let AddArgs {
         name,
@@ -199,10 +216,17 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
 
     validate_server_name(&name)?;
 
-    let codex_home = find_codex_home().context("failed to resolve CODEX_HOME")?;
+    let codex_home = find_codex_home()
+        .with_context(|| t("failed to resolve CODEX_HOME", "无法解析 CODEX_HOME").to_string())?;
     let mut servers = load_global_mcp_servers(&codex_home)
         .await
-        .with_context(|| format!("failed to load MCP servers from {}", codex_home.display()))?;
+        .with_context(|| {
+            if is_zh_locale() {
+                format!("从 {} 加载 MCP 服务器失败", codex_home.display())
+            } else {
+                format!("failed to load MCP servers from {}", codex_home.display())
+            }
+        })?;
 
     let transport = match transport_args {
         AddMcpTransportArgs {
@@ -211,7 +235,7 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
             let mut command_parts = stdio.command.into_iter();
             let command_bin = command_parts
                 .next()
-                .ok_or_else(|| anyhow!("command is required"))?;
+                .ok_or_else(|| anyhow!(t("command is required", "必须提供命令")))?;
             let command_args: Vec<String> = command_parts.collect();
 
             let env_map = if stdio.env.is_empty() {
@@ -240,7 +264,13 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
             http_headers: None,
             env_http_headers: None,
         },
-        AddMcpTransportArgs { .. } => bail!("exactly one of --command or --url must be provided"),
+        AddMcpTransportArgs { .. } => bail!(
+            "{}",
+            t(
+                "exactly one of --command or --url must be provided",
+                "必须且只能提供 --command 或 --url 之一",
+            )
+        ),
     };
 
     let new_entry = McpServerConfig {
@@ -262,13 +292,32 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
         .replace_mcp_servers(&servers)
         .apply()
         .await
-        .with_context(|| format!("failed to write MCP servers to {}", codex_home.display()))?;
+        .with_context(|| {
+            if is_zh_locale() {
+                format!("写入 MCP 服务器配置失败：{}", codex_home.display())
+            } else {
+                format!("failed to write MCP servers to {}", codex_home.display())
+            }
+        })?;
 
-    println!("Added global MCP server '{name}'.");
+    println!(
+        "{}",
+        if is_zh_locale() {
+            format!("已添加全局 MCP 服务器 '{name}'。")
+        } else {
+            format!("Added global MCP server '{name}'.")
+        }
+    );
 
     match oauth_login_support(&transport).await {
         McpOAuthLoginSupport::Supported(oauth_config) => {
-            println!("Detected OAuth support. Starting OAuth flow…");
+            println!(
+                "{}",
+                t(
+                    "Detected OAuth support. Starting OAuth flow…",
+                    "检测到 OAuth 支持，正在开始 OAuth 流程…",
+                )
+            );
             perform_oauth_login(
                 &name,
                 &oauth_config.url,
@@ -281,11 +330,20 @@ async fn run_add(config_overrides: &CliConfigOverrides, add_args: AddArgs) -> Re
                 config.mcp_oauth_callback_url.as_deref(),
             )
             .await?;
-            println!("Successfully logged in.");
+            println!("{}", t("Successfully logged in.", "登录成功。"));
         }
         McpOAuthLoginSupport::Unsupported => {}
         McpOAuthLoginSupport::Unknown(_) => println!(
-            "MCP server may or may not require login. Run `codex mcp login {name}` to login."
+            "{}",
+            if is_zh_locale() {
+                format!(
+                    "MCP 服务器可能需要登录，也可能不需要。请运行 `codex mcp login {name}` 登录。"
+                )
+            } else {
+                format!(
+                    "MCP server may or may not require login. Run `codex mcp login {name}` to login."
+                )
+            }
         ),
     }
 
@@ -301,10 +359,17 @@ async fn run_remove(config_overrides: &CliConfigOverrides, remove_args: RemoveAr
 
     validate_server_name(&name)?;
 
-    let codex_home = find_codex_home().context("failed to resolve CODEX_HOME")?;
+    let codex_home = find_codex_home()
+        .with_context(|| t("failed to resolve CODEX_HOME", "无法解析 CODEX_HOME").to_string())?;
     let mut servers = load_global_mcp_servers(&codex_home)
         .await
-        .with_context(|| format!("failed to load MCP servers from {}", codex_home.display()))?;
+        .with_context(|| {
+            if is_zh_locale() {
+                format!("从 {} 加载 MCP 服务器失败", codex_home.display())
+            } else {
+                format!("failed to load MCP servers from {}", codex_home.display())
+            }
+        })?;
 
     let removed = servers.remove(&name).is_some();
 
@@ -313,13 +378,33 @@ async fn run_remove(config_overrides: &CliConfigOverrides, remove_args: RemoveAr
             .replace_mcp_servers(&servers)
             .apply()
             .await
-            .with_context(|| format!("failed to write MCP servers to {}", codex_home.display()))?;
+            .with_context(|| {
+                if is_zh_locale() {
+                    format!("写入 MCP 服务器配置失败：{}", codex_home.display())
+                } else {
+                    format!("failed to write MCP servers to {}", codex_home.display())
+                }
+            })?;
     }
 
     if removed {
-        println!("Removed global MCP server '{name}'.");
+        println!(
+            "{}",
+            if is_zh_locale() {
+                format!("已移除全局 MCP 服务器 '{name}'。")
+            } else {
+                format!("Removed global MCP server '{name}'.")
+            }
+        );
     } else {
-        println!("No MCP server named '{name}' found.");
+        println!(
+            "{}",
+            if is_zh_locale() {
+                format!("未找到名为 '{name}' 的 MCP 服务器。")
+            } else {
+                format!("No MCP server named '{name}' found.")
+            }
+        );
     }
 
     Ok(())
@@ -331,14 +416,21 @@ async fn run_login(config_overrides: &CliConfigOverrides, login_args: LoginArgs)
         .map_err(anyhow::Error::msg)?;
     let config = Config::load_with_cli_overrides(overrides)
         .await
-        .context("failed to load configuration")?;
+        .with_context(|| t("failed to load configuration", "加载配置失败").to_string())?;
     let mcp_manager = McpManager::new(Arc::new(PluginsManager::new(config.codex_home.clone())));
     let mcp_servers = mcp_manager.effective_servers(&config, None);
 
     let LoginArgs { name, scopes } = login_args;
 
     let Some(server) = mcp_servers.get(&name) else {
-        bail!("No MCP server named '{name}' found.");
+        bail!(
+            "{}",
+            if is_zh_locale() {
+                format!("未找到名为 '{name}' 的 MCP 服务器。")
+            } else {
+                format!("No MCP server named '{name}' found.")
+            }
+        );
     };
 
     let (url, http_headers, env_http_headers) = match &server.transport {
@@ -348,7 +440,13 @@ async fn run_login(config_overrides: &CliConfigOverrides, login_args: LoginArgs)
             env_http_headers,
             ..
         } => (url.clone(), http_headers.clone(), env_http_headers.clone()),
-        _ => bail!("OAuth login is only supported for streamable HTTP servers."),
+        _ => bail!(
+            "{}",
+            t(
+                "OAuth login is only supported for streamable HTTP servers.",
+                "OAuth 登录仅支持 streamable HTTP 服务器。",
+            )
+        ),
     };
 
     let mut scopes = scopes;
@@ -368,7 +466,14 @@ async fn run_login(config_overrides: &CliConfigOverrides, login_args: LoginArgs)
         config.mcp_oauth_callback_url.as_deref(),
     )
     .await?;
-    println!("Successfully logged in to MCP server '{name}'.");
+    println!(
+        "{}",
+        if is_zh_locale() {
+            format!("已成功登录 MCP 服务器 '{name}'。")
+        } else {
+            format!("Successfully logged in to MCP server '{name}'.")
+        }
+    );
     Ok(())
 }
 
@@ -378,25 +483,61 @@ async fn run_logout(config_overrides: &CliConfigOverrides, logout_args: LogoutAr
         .map_err(anyhow::Error::msg)?;
     let config = Config::load_with_cli_overrides(overrides)
         .await
-        .context("failed to load configuration")?;
+        .with_context(|| t("failed to load configuration", "加载配置失败").to_string())?;
     let mcp_manager = McpManager::new(Arc::new(PluginsManager::new(config.codex_home.clone())));
     let mcp_servers = mcp_manager.effective_servers(&config, None);
 
     let LogoutArgs { name } = logout_args;
 
-    let server = mcp_servers
-        .get(&name)
-        .ok_or_else(|| anyhow!("No MCP server named '{name}' found in configuration."))?;
+    let server = mcp_servers.get(&name).ok_or_else(|| {
+        anyhow!(
+            "{}",
+            if is_zh_locale() {
+                format!("配置中未找到名为 '{name}' 的 MCP 服务器。")
+            } else {
+                format!("No MCP server named '{name}' found in configuration.")
+            }
+        )
+    })?;
 
     let url = match &server.transport {
         McpServerTransportConfig::StreamableHttp { url, .. } => url.clone(),
-        _ => bail!("OAuth logout is only supported for streamable_http transports."),
+        _ => bail!(
+            "{}",
+            t(
+                "OAuth logout is only supported for streamable_http transports.",
+                "OAuth 登出仅支持 streamable_http 传输。",
+            )
+        ),
     };
 
     match delete_oauth_tokens(&name, &url, config.mcp_oauth_credentials_store_mode) {
-        Ok(true) => println!("Removed OAuth credentials for '{name}'."),
-        Ok(false) => println!("No OAuth credentials stored for '{name}'."),
-        Err(err) => return Err(anyhow!("failed to delete OAuth credentials: {err}")),
+        Ok(true) => println!(
+            "{}",
+            if is_zh_locale() {
+                format!("已删除 '{name}' 的 OAuth 凭据。")
+            } else {
+                format!("Removed OAuth credentials for '{name}'.")
+            }
+        ),
+        Ok(false) => println!(
+            "{}",
+            if is_zh_locale() {
+                format!("未找到 '{name}' 的 OAuth 凭据。")
+            } else {
+                format!("No OAuth credentials stored for '{name}'.")
+            }
+        ),
+        Err(err) => {
+            return Err(anyhow!(
+                "{}",
+                if is_zh_locale() {
+                    format!("删除 OAuth 凭据失败：{err}")
+                } else {
+                    format!("failed to delete OAuth credentials: {err}")
+                }
+            ));
+        }
     }
 
     Ok(())
@@ -408,7 +549,7 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
         .map_err(anyhow::Error::msg)?;
     let config = Config::load_with_cli_overrides(overrides)
         .await
-        .context("failed to load configuration")?;
+        .with_context(|| t("failed to load configuration", "加载配置失败").to_string())?;
     let mcp_manager = McpManager::new(Arc::new(PluginsManager::new(config.codex_home.clone())));
     let mcp_servers = mcp_manager.effective_servers(&config, None);
 
@@ -477,7 +618,13 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
     }
 
     if entries.is_empty() {
-        println!("No MCP servers configured yet. Try `codex mcp add my-tool -- my-command`.");
+        println!(
+            "{}",
+            t(
+                "No MCP servers configured yet. Try `codex mcp add my-tool -- my-command`.",
+                "尚未配置 MCP 服务器。试试 `codex mcp add my-tool -- my-command`。",
+            )
+        );
         return Ok(());
     }
 
@@ -545,14 +692,22 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
     }
 
     if !stdio_rows.is_empty() {
+        let header_name = t("Name", "名称");
+        let header_command = t("Command", "命令");
+        let header_args = t("Args", "参数");
+        let header_env = t("Env", "环境");
+        let header_cwd = t("Cwd", "目录");
+        let header_status = t("Status", "状态");
+        let header_auth = t("Auth", "认证");
+
         let mut widths = [
-            "Name".len(),
-            "Command".len(),
-            "Args".len(),
-            "Env".len(),
-            "Cwd".len(),
-            "Status".len(),
-            "Auth".len(),
+            header_name.len(),
+            header_command.len(),
+            header_args.len(),
+            header_env.len(),
+            header_cwd.len(),
+            header_status.len(),
+            header_auth.len(),
         ];
         for row in &stdio_rows {
             for (i, cell) in row.iter().enumerate() {
@@ -562,13 +717,13 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
 
         println!(
             "{name:<name_w$}  {command:<cmd_w$}  {args:<args_w$}  {env:<env_w$}  {cwd:<cwd_w$}  {status:<status_w$}  {auth:<auth_w$}",
-            name = "Name",
-            command = "Command",
-            args = "Args",
-            env = "Env",
-            cwd = "Cwd",
-            status = "Status",
-            auth = "Auth",
+            name = header_name,
+            command = header_command,
+            args = header_args,
+            env = header_env,
+            cwd = header_cwd,
+            status = header_status,
+            auth = header_auth,
             name_w = widths[0],
             cmd_w = widths[1],
             args_w = widths[2],
@@ -604,12 +759,18 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
     }
 
     if !http_rows.is_empty() {
+        let header_name = t("Name", "名称");
+        let header_url = t("Url", "地址");
+        let header_token = t("Bearer Token Env Var", "Bearer Token 环境变量");
+        let header_status = t("Status", "状态");
+        let header_auth = t("Auth", "认证");
+
         let mut widths = [
-            "Name".len(),
-            "Url".len(),
-            "Bearer Token Env Var".len(),
-            "Status".len(),
-            "Auth".len(),
+            header_name.len(),
+            header_url.len(),
+            header_token.len(),
+            header_status.len(),
+            header_auth.len(),
         ];
         for row in &http_rows {
             for (i, cell) in row.iter().enumerate() {
@@ -619,11 +780,11 @@ async fn run_list(config_overrides: &CliConfigOverrides, list_args: ListArgs) ->
 
         println!(
             "{name:<name_w$}  {url:<url_w$}  {token:<token_w$}  {status:<status_w$}  {auth:<auth_w$}",
-            name = "Name",
-            url = "Url",
-            token = "Bearer Token Env Var",
-            status = "Status",
-            auth = "Auth",
+            name = header_name,
+            url = header_url,
+            token = header_token,
+            status = header_status,
+            auth = header_auth,
             name_w = widths[0],
             url_w = widths[1],
             token_w = widths[2],
@@ -657,12 +818,19 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
         .map_err(anyhow::Error::msg)?;
     let config = Config::load_with_cli_overrides(overrides)
         .await
-        .context("failed to load configuration")?;
+        .with_context(|| t("failed to load configuration", "加载配置失败").to_string())?;
     let mcp_manager = McpManager::new(Arc::new(PluginsManager::new(config.codex_home.clone())));
     let mcp_servers = mcp_manager.effective_servers(&config, None);
 
     let Some(server) = mcp_servers.get(&get_args.name) else {
-        bail!("No MCP server named '{name}' found.", name = get_args.name);
+        bail!(
+            "{}",
+            if is_zh_locale() {
+                format!("未找到名为 '{name}' 的 MCP 服务器。", name = get_args.name)
+            } else {
+                format!("No MCP server named '{name}' found.", name = get_args.name)
+            }
+        );
     };
 
     if get_args.json {
@@ -714,7 +882,13 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
 
     if !server.enabled {
         if let Some(reason) = server.disabled_reason.as_ref() {
-            println!("{name} (disabled: {reason})", name = get_args.name);
+            if is_zh_locale() {
+                println!("{name}（已禁用：{reason}）", name = get_args.name);
+            } else {
+                println!("{name} (disabled: {reason})", name = get_args.name);
+            }
+        } else if is_zh_locale() {
+            println!("{name}（已禁用）", name = get_args.name);
         } else {
             println!("{name} (disabled)", name = get_args.name);
         }
@@ -722,7 +896,12 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
     }
 
     println!("{}", get_args.name);
-    println!("  enabled: {}", server.enabled);
+    let enabled_display = if server.enabled {
+        t("true", "是")
+    } else {
+        t("false", "否")
+    };
+    println!("  {}: {enabled_display}", t("enabled", "已启用"));
     let format_tool_list = |tools: &Option<Vec<String>>| -> String {
         match tools {
             Some(list) if list.is_empty() => "[]".to_string(),
@@ -732,11 +911,17 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
     };
     if server.enabled_tools.is_some() {
         let enabled_tools_display = format_tool_list(&server.enabled_tools);
-        println!("  enabled_tools: {enabled_tools_display}");
+        println!(
+            "  {}: {enabled_tools_display}",
+            t("enabled_tools", "已启用的工具")
+        );
     }
     if server.disabled_tools.is_some() {
         let disabled_tools_display = format_tool_list(&server.disabled_tools);
-        println!("  disabled_tools: {disabled_tools_display}");
+        println!(
+            "  {}: {disabled_tools_display}",
+            t("disabled_tools", "已禁用的工具")
+        );
     }
     match &server.transport {
         McpServerTransportConfig::Stdio {
@@ -746,22 +931,22 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
             env_vars,
             cwd,
         } => {
-            println!("  transport: stdio");
-            println!("  command: {command}");
+            println!("  {}: stdio", t("transport", "传输"));
+            println!("  {}: {command}", t("command", "命令"));
             let args_display = if args.is_empty() {
                 "-".to_string()
             } else {
                 args.join(" ")
             };
-            println!("  args: {args_display}");
+            println!("  {}: {args_display}", t("args", "参数"));
             let cwd_display = cwd
                 .as_ref()
                 .map(|path| path.display().to_string())
                 .filter(|value| !value.is_empty())
                 .unwrap_or_else(|| "-".to_string());
-            println!("  cwd: {cwd_display}");
+            println!("  {}: {cwd_display}", t("cwd", "目录"));
             let env_display = format_env_display(env.as_ref(), env_vars);
-            println!("  env: {env_display}");
+            println!("  {}: {env_display}", t("env", "环境"));
         }
         McpServerTransportConfig::StreamableHttp {
             url,
@@ -769,10 +954,13 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
             http_headers,
             env_http_headers,
         } => {
-            println!("  transport: streamable_http");
-            println!("  url: {url}");
+            println!("  {}: streamable_http", t("transport", "传输"));
+            println!("  {}: {url}", t("url", "地址"));
             let bearer_token_display = bearer_token_env_var.as_deref().unwrap_or("-");
-            println!("  bearer_token_env_var: {bearer_token_display}");
+            println!(
+                "  {}: {bearer_token_display}",
+                t("bearer_token_env_var", "Bearer Token 环境变量")
+            );
             let headers_display = match http_headers {
                 Some(map) if !map.is_empty() => {
                     let mut pairs: Vec<_> = map.iter().collect();
@@ -785,7 +973,7 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
                 }
                 _ => "-".to_string(),
             };
-            println!("  http_headers: {headers_display}");
+            println!("  {}: {headers_display}", t("http_headers", "HTTP 头"));
             let env_headers_display = match env_http_headers {
                 Some(map) if !map.is_empty() => {
                     let mut pairs: Vec<_> = map.iter().collect();
@@ -798,16 +986,31 @@ async fn run_get(config_overrides: &CliConfigOverrides, get_args: GetArgs) -> Re
                 }
                 _ => "-".to_string(),
             };
-            println!("  env_http_headers: {env_headers_display}");
+            println!(
+                "  {}: {env_headers_display}",
+                t("env_http_headers", "环境变量 HTTP 头")
+            );
         }
     }
     if let Some(timeout) = server.startup_timeout_sec {
-        println!("  startup_timeout_sec: {}", timeout.as_secs_f64());
+        println!(
+            "  {}: {}",
+            t("startup_timeout_sec", "启动超时(秒)"),
+            timeout.as_secs_f64()
+        );
     }
     if let Some(timeout) = server.tool_timeout_sec {
-        println!("  tool_timeout_sec: {}", timeout.as_secs_f64());
+        println!(
+            "  {}: {}",
+            t("tool_timeout_sec", "工具超时(秒)"),
+            timeout.as_secs_f64()
+        );
     }
-    println!("  remove: codex mcp remove {}", get_args.name);
+    println!(
+        "  {}: codex mcp remove {}",
+        t("remove", "删除命令"),
+        get_args.name
+    );
 
     Ok(())
 }
@@ -818,11 +1021,20 @@ fn parse_env_pair(raw: &str) -> Result<(String, String), String> {
         .next()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| "environment entries must be in KEY=VALUE form".to_string())?;
-    let value = parts
-        .next()
-        .map(str::to_string)
-        .ok_or_else(|| "environment entries must be in KEY=VALUE form".to_string())?;
+        .ok_or_else(|| {
+            t(
+                "environment entries must be in KEY=VALUE form",
+                "环境变量项必须为 KEY=VALUE 格式",
+            )
+            .to_string()
+        })?;
+    let value = parts.next().map(str::to_string).ok_or_else(|| {
+        t(
+            "environment entries must be in KEY=VALUE form",
+            "环境变量项必须为 KEY=VALUE 格式",
+        )
+        .to_string()
+    })?;
 
     Ok((key.to_string(), value))
 }
@@ -836,16 +1048,27 @@ fn validate_server_name(name: &str) -> Result<()> {
     if is_valid {
         Ok(())
     } else {
-        bail!("invalid server name '{name}' (use letters, numbers, '-', '_')");
+        bail!(
+            "{}",
+            if is_zh_locale() {
+                format!("无效的服务器名称 '{name}'（仅允许字母、数字、'-'、'_'）")
+            } else {
+                format!("invalid server name '{name}' (use letters, numbers, '-', '_')")
+            }
+        );
     }
 }
 
 fn format_mcp_status(config: &McpServerConfig) -> String {
     if config.enabled {
-        "enabled".to_string()
+        t("enabled", "已启用").to_string()
     } else if let Some(reason) = config.disabled_reason.as_ref() {
-        format!("disabled: {reason}")
+        if is_zh_locale() {
+            format!("已禁用：{reason}")
+        } else {
+            format!("disabled: {reason}")
+        }
     } else {
-        "disabled".to_string()
+        t("disabled", "已禁用").to_string()
     }
 }

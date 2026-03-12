@@ -3,11 +3,11 @@ source: tui/src/bottom_pane/chat_composer.rs
 expression: terminal.backend()
 ---
 "                                                                                                    "
-"› Ask Codex to do anything                                                                          "
+"› 让 Codex 做任何事                                                                          "
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
 "                                                                                                    "
-"  esc esc to edit previous message                                                                  "
+"  esc esc 编辑上一条消息                                                                            "

@@ -3,21 +3,16 @@ source: tui/src/chatwidget/tests.rs
 assertion_line: 3945
 expression: popup
 ---
-  Update Model Permissions
+  更新模型权限
 
-› 1. Read Only (current)             Codex can read files in the current
-                                     workspace. Approval is required to edit
-                                     files or access the internet.
-  2. Default (non-admin sandbox)  Codex can read and edit files in the
-                                     current workspace, and run commands.
-                                     Approval is required to access the
-                                     internet or edit other files.
-  3. Full Access                     Codex can edit files outside this
-                                     workspace and access the internet without
-                                     asking for approval. Exercise caution
-                                     when using.
+› 1. 只读（当前）                   Codex 可读取当前工作区中的文件。
+                                     编辑文件或访问互联网需要审批。
+  2. 默认（非管理员沙盒）           Codex 可以读取并编辑当前工作区中的文件，并
+                                     运行命令。访问互联网或编辑其他文件需要审批。
+                                     （与 Agent 模式相同）
+  3. 完全访问                       Codex 可在无需审批的情况下编辑工作区外文件并访问
+                                     互联网。使用时请谨慎。
 
-  The non-admin sandbox protects your files and prevents network access under
-  most circumstances. However, it carries greater risk if prompt injected. To
-  upgrade to the default sandbox, run /setup-default-sandbox.
-  Press enter to confirm or esc to go back
+  非管理员沙盒可以在多数情况下保护你的文件并阻止网络访问。但如果提示词
+  被注入，风险更高。要升级到默认沙盒，请运行 /setup-default-sandbox。
+  按 Enter 确认或按 Esc 返回

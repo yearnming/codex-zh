@@ -3,10 +3,10 @@ source: tui/src/chatwidget/tests.rs
 assertion_line: 6001
 expression: popup
 ---
-  Enable multi-agent?
-  Multi-agent is currently disabled in your config.
+  启用多 Agent？
+  你的配置中当前已禁用多 Agent。
 
-› 1. Yes, enable  Save the setting now. You will need a new session to use it.
-  2. Not now      Keep multi-agent disabled.
+› 1. 是，启用      现在保存设置。你需要新会话才能使用。
+  2. 暂不         继续保持多 Agent 关闭。
 
-  Press enter to confirm or esc to go back
+  按 Enter 确认或按 Esc 返回

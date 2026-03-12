@@ -28,4 +28,6 @@ codex [OPTIONS] <COMMAND> [ARGS]
 说明：部分命令被标记为实验或内部用途，可能随上游变动。
 
 ## 语言切换
-设置环境变量 `CODEX_LOCALE=zh-CN`，或系统语言包含 `zh`，即可启用中文帮助与错误提示。
+默认启用中文。需要英文时，请使用：
+- `codex --lang en`
+- `codex --locale en`

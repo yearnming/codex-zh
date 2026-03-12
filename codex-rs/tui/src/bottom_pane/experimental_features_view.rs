@@ -29,6 +29,10 @@ use super::selection_popup_common::GenericDisplayRow;
 use super::selection_popup_common::measure_rows_height;
 use super::selection_popup_common::render_rows;
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 pub(crate) struct ExperimentalFeatureItem {
     pub feature: Feature,
     pub name: String,
@@ -51,9 +55,13 @@ impl ExperimentalFeaturesView {
         app_event_tx: AppEventSender,
     ) -> Self {
         let mut header = ColumnRenderable::new();
-        header.push(Line::from("Experimental features".bold()));
+        header.push(Line::from(t("Experimental features", "实验性功能").bold()));
         header.push(Line::from(
-            "Toggle experimental features. Changes are saved to config.toml.".dim(),
+            t(
+                "Toggle experimental features. Changes are saved to config.toml.",
+                "开关实验性功能。更改将保存到 config.toml。",
+            )
+            .dim(),
         ));
 
         let mut view = Self {
@@ -260,7 +268,10 @@ impl Renderable for ExperimentalFeaturesView {
                 &rows,
                 &self.state,
                 MAX_POPUP_ROWS,
-                "  No experimental features available for now",
+                t(
+                    "  No experimental features available for now",
+                    "  暂无可用的实验性功能",
+                ),
             );
         }
 
@@ -291,10 +302,10 @@ impl Renderable for ExperimentalFeaturesView {
 
 fn experimental_popup_hint_line() -> Line<'static> {
     Line::from(vec![
-        "Press ".into(),
+        t("Press ", "按 ").into(),
         key_hint::plain(KeyCode::Char(' ')).into(),
-        " to select or ".into(),
+        t(" to select or ", " 选择，或按 ").into(),
         key_hint::plain(KeyCode::Enter).into(),
-        " to save for next conversation".into(),
+        t(" to save for next conversation", " 保存到下次会话").into(),
     ])
 }

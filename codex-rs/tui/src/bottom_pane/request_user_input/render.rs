@@ -116,12 +116,22 @@ impl Renderable for RequestUserInputOverlay {
 impl RequestUserInputOverlay {
     fn unanswered_confirmation_data(&self) -> UnansweredConfirmationData {
         let unanswered = self.unanswered_question_count();
-        let subtitle = format!(
-            "{unanswered} unanswered question{}",
-            if unanswered == 1 { "" } else { "s" }
-        );
+        let subtitle = if crate::is_zh_locale() {
+            format!("{unanswered} 个未回答问题")
+        } else {
+            format!(
+                "{unanswered} unanswered question{}",
+                if unanswered == 1 { "" } else { "s" }
+            )
+        };
         UnansweredConfirmationData {
-            title_line: Line::from(super::UNANSWERED_CONFIRM_TITLE.bold()),
+            title_line: Line::from(
+                super::t(
+                    super::UNANSWERED_CONFIRM_TITLE,
+                    "还有未回答问题，仍要提交吗？",
+                )
+                .bold(),
+            ),
             subtitle_line: Line::from(subtitle.dim()),
             hint_line: standard_popup_hint_line(),
             rows: self.unanswered_confirmation_rows(),
@@ -220,7 +230,7 @@ impl RequestUserInputOverlay {
             &layout.rows,
             &layout.state,
             layout.rows.len().max(1),
-            "No choices",
+            super::t("No choices", "无可选项"),
         );
 
         cursor_y = cursor_y.saturating_add(rows_height);
@@ -267,14 +277,25 @@ impl RequestUserInputOverlay {
         let progress_line = if self.question_count() > 0 {
             let idx = self.current_index() + 1;
             let total = self.question_count();
-            let base = format!("Question {idx}/{total}");
+            let base = if crate::is_zh_locale() {
+                format!("问题 {idx}/{total}")
+            } else {
+                format!("Question {idx}/{total}")
+            };
             if unanswered > 0 {
-                Line::from(format!("{base} ({unanswered} unanswered)").dim())
+                Line::from(
+                    if crate::is_zh_locale() {
+                        format!("{base}（{unanswered} 未回答）")
+                    } else {
+                        format!("{base} ({unanswered} unanswered)")
+                    }
+                    .dim(),
+                )
             } else {
                 Line::from(base.dim())
             }
         } else {
-            Line::from("No questions".dim())
+            Line::from(super::t("No questions", "暂无问题").dim())
         };
         Paragraph::new(progress_line).render(sections.progress_area, buf);
 
@@ -322,7 +343,7 @@ impl RequestUserInputOverlay {
                     &option_rows,
                     &options_state,
                     option_rows.len().max(1),
-                    "No options",
+                    super::t("No options", "无可选项"),
                 );
             }
         }
@@ -350,7 +371,11 @@ impl RequestUserInputOverlay {
         let option_tip = if options_hidden {
             let selected = self.selected_option_index().unwrap_or(0).saturating_add(1);
             let total = self.options_len();
-            Some(super::FooterTip::new(format!("option {selected}/{total}")))
+            Some(super::FooterTip::new(if crate::is_zh_locale() {
+                format!("选项 {selected}/{total}")
+            } else {
+                format!("option {selected}/{total}")
+            }))
         } else {
             None
         };

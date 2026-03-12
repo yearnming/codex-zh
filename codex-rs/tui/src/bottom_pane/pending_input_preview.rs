@@ -4,11 +4,28 @@ use ratatui::layout::Rect;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
+use std::env;
 
 use crate::key_hint;
 use crate::render::renderable::Renderable;
 use crate::wrapping::RtOptions;
 use crate::wrapping::adaptive_wrap_lines;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
 
 /// Widget that displays pending steers plus user messages queued while a turn is in progress.
 ///
@@ -78,10 +95,22 @@ impl PendingInputPreview {
                 &mut lines,
                 width,
                 Line::from(vec![
-                    "Messages to be submitted after next tool call".into(),
-                    " (press ".dim(),
+                    t(
+                        "Messages to be submitted after next tool call",
+                        "将在下一次工具调用后提交的消息",
+                    )
+                    .into(),
+                    if is_zh_locale() {
+                        "（按 ".dim()
+                    } else {
+                        " (press ".dim()
+                    },
                     key_hint::plain(KeyCode::Esc).into(),
-                    " to interrupt and send immediately)".dim(),
+                    if is_zh_locale() {
+                        " 中断并立即发送）".dim()
+                    } else {
+                        " to interrupt and send immediately)".dim()
+                    },
                 ]),
             );
 
@@ -100,7 +129,11 @@ impl PendingInputPreview {
             if !lines.is_empty() {
                 lines.push(Line::from(""));
             }
-            Self::push_section_header(&mut lines, width, "Queued follow-up messages".into());
+            Self::push_section_header(
+                &mut lines,
+                width,
+                t("Queued follow-up messages", "已排队的后续消息").into(),
+            );
 
             for message in &self.queued_messages {
                 let wrapped = adaptive_wrap_lines(
@@ -122,7 +155,7 @@ impl PendingInputPreview {
                 Line::from(vec![
                     "    ".into(),
                     self.edit_binding.into(),
-                    " edit last queued message".into(),
+                    t(" edit last queued message", " 编辑最近排队的消息").into(),
                 ])
                 .dim(),
             );
@@ -274,7 +307,7 @@ mod tests {
     #[test]
     fn render_one_pending_steer() {
         let mut queue = PendingInputPreview::new();
-        queue.pending_steers.push("Please continue.".to_string());
+        queue.pending_steers.push("请继续。".to_string());
         let width = 48;
         let height = queue.desired_height(width);
         let mut buf = Buffer::empty(Rect::new(0, 0, width, height));
@@ -285,13 +318,11 @@ mod tests {
     #[test]
     fn render_pending_steers_above_queued_messages() {
         let mut queue = PendingInputPreview::new();
-        queue.pending_steers.push("Please continue.".to_string());
+        queue.pending_steers.push("请继续。".to_string());
         queue
             .pending_steers
             .push("Check the last command output.".to_string());
-        queue
-            .queued_messages
-            .push("Queued follow-up question".to_string());
+        queue.queued_messages.push("排队的后续问题".to_string());
         let width = 52;
         let height = queue.desired_height(width);
         let mut buf = Buffer::empty(Rect::new(0, 0, width, height));

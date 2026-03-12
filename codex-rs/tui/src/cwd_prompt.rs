@@ -29,18 +29,22 @@ pub(crate) enum CwdPromptAction {
     Fork,
 }
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 impl CwdPromptAction {
     fn verb(self) -> &'static str {
         match self {
-            CwdPromptAction::Resume => "resume",
-            CwdPromptAction::Fork => "fork",
+            CwdPromptAction::Resume => t("resume", "恢复"),
+            CwdPromptAction::Fork => t("fork", "分叉"),
         }
     }
 
     fn past_participle(self) -> &'static str {
         match self {
-            CwdPromptAction::Resume => "resumed",
-            CwdPromptAction::Fork => "forked",
+            CwdPromptAction::Resume => t("resumed", "恢复"),
+            CwdPromptAction::Fork => t("forked", "分叉"),
         }
     }
 }
@@ -199,42 +203,68 @@ impl WidgetRef for &CwdPromptScreen {
         let action_past = self.action.past_participle();
         let current_cwd = self.current_cwd.as_str();
         let session_cwd = self.session_cwd.as_str();
+        let is_zh = crate::is_zh_locale();
 
         column.push("");
-        column.push(Line::from(vec![
-            "Choose working directory to ".into(),
-            action_verb.bold(),
-            " this session".into(),
-        ]));
+        column.push(Line::from(if is_zh {
+            vec!["选择工作目录以".into(), action_verb.bold(), "此会话".into()]
+        } else {
+            vec![
+                "Choose working directory to ".into(),
+                action_verb.bold(),
+                " this session".into(),
+            ]
+        }));
         column.push("");
         column.push(
-            Line::from(format!(
-                "Session = latest cwd recorded in the {action_past} session"
-            ))
+            Line::from(if is_zh {
+                format!("会话 = 已{action_past}会话中记录的最新工作目录")
+            } else {
+                format!("Session = latest cwd recorded in the {action_past} session")
+            })
             .dim()
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.push(
-            Line::from("Current = your current working directory".dim())
-                .inset(Insets::tlbr(0, 2, 0, 0)),
+            Line::from(
+                if is_zh {
+                    "当前 = 当前工作目录"
+                } else {
+                    "Current = your current working directory"
+                }
+                .dim(),
+            )
+            .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.push("");
         column.push(selection_option_row(
             0,
-            format!("Use session directory ({session_cwd})"),
+            if is_zh {
+                format!("使用会话目录（{session_cwd}）")
+            } else {
+                format!("Use session directory ({session_cwd})")
+            },
             self.highlighted == CwdSelection::Session,
         ));
         column.push(selection_option_row(
             1,
-            format!("Use current directory ({current_cwd})"),
+            if is_zh {
+                format!("使用当前目录（{current_cwd}）")
+            } else {
+                format!("Use current directory ({current_cwd})")
+            },
             self.highlighted == CwdSelection::Current,
         ));
         column.push("");
         column.push(
             Line::from(vec![
-                "Press ".dim(),
+                if is_zh { "按 ".dim() } else { "Press ".dim() },
                 key_hint::plain(KeyCode::Enter).into(),
-                " to continue".dim(),
+                if is_zh {
+                    " 继续".dim()
+                } else {
+                    " to continue".dim()
+                },
             ])
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );

@@ -3,11 +3,11 @@ source: tui/src/bottom_pane/chat_composer.rs
 expression: terminal.backend()
 ---
 "                                            "
-"› Ask Codex to do anything                  "
+"› 让 Codex 做任何事                  "
 "                                            "
 "                                            "
 "                                            "
 "                                            "
 "                                            "
 "                                            "
-"  Plan mode (shift+tab to cycle)            "
+"  Plan 模式 (shift+tab 切换)                "

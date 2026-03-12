@@ -37,11 +37,8 @@ use codex_protocol::request_user_input::RequestUserInputResponse;
 use codex_protocol::user_input::TextElement;
 use unicode_width::UnicodeWidthStr;
 
-const NOTES_PLACEHOLDER: &str = "Add notes";
-const ANSWER_PLACEHOLDER: &str = "Type your answer (optional)";
 // Keep in sync with ChatComposer's minimum composer height.
 const MIN_COMPOSER_HEIGHT: u16 = 3;
-const SELECT_OPTION_PLACEHOLDER: &str = "Select an option to add notes";
 pub(super) const TIP_SEPARATOR: &str = " | ";
 pub(super) const DESIRED_SPACERS_BETWEEN_SECTIONS: u16 = 2;
 const OTHER_OPTION_LABEL: &str = "None of the above";
@@ -52,6 +49,10 @@ const UNANSWERED_CONFIRM_GO_BACK_DESC: &str = "Return to the first unanswered qu
 const UNANSWERED_CONFIRM_SUBMIT: &str = "Proceed";
 const UNANSWERED_CONFIRM_SUBMIT_DESC_SINGULAR: &str = "question";
 const UNANSWERED_CONFIRM_SUBMIT_DESC_PLURAL: &str = "questions";
+
+pub(super) fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Focus {
@@ -149,7 +150,7 @@ impl RequestUserInputOverlay {
             has_input_focus,
             app_event_tx.clone(),
             enhanced_keys_supported,
-            ANSWER_PLACEHOLDER.to_string(),
+            t("Type your answer (optional)", "输入你的回答（可选）").to_string(),
             disable_paste_burst,
             ChatComposerConfig::plain_text(),
         );
@@ -298,9 +299,16 @@ impl RequestUserInputOverlay {
                     let number = idx + 1;
                     let prefix_label = format!("{prefix} {number}. ");
                     let wrap_indent = UnicodeWidthStr::width(prefix_label.as_str());
+                    let other_label = t(OTHER_OPTION_LABEL, "以上都不是");
                     rows.push(GenericDisplayRow {
-                        name: format!("{prefix_label}{OTHER_OPTION_LABEL}"),
-                        description: Some(OTHER_OPTION_DESCRIPTION.to_string()),
+                        name: format!("{prefix_label}{other_label}"),
+                        description: Some(
+                            t(
+                                OTHER_OPTION_DESCRIPTION,
+                                "（可选）在备注中补充细节（tab）。",
+                            )
+                            .to_string(),
+                        ),
                         wrap_indent: Some(wrap_indent),
                         ..Default::default()
                     });
@@ -400,11 +408,11 @@ impl RequestUserInputOverlay {
 
     fn notes_placeholder(&self) -> &'static str {
         if self.has_options() && self.selected_option_index().is_none() {
-            SELECT_OPTION_PLACEHOLDER
+            t("Select an option to add notes", "选择一个选项以添加备注")
         } else if self.has_options() {
-            NOTES_PLACEHOLDER
+            t("Add notes", "添加备注")
         } else {
-            ANSWER_PLACEHOLDER
+            t("Type your answer (optional)", "输入你的回答（可选）")
         }
     }
 
@@ -431,32 +439,44 @@ impl RequestUserInputOverlay {
         let notes_visible = self.notes_ui_visible();
         if self.has_options() {
             if self.selected_option_index().is_some() && !notes_visible {
-                tips.push(FooterTip::highlighted("tab to add notes"));
+                tips.push(FooterTip::highlighted(t(
+                    "tab to add notes",
+                    "tab 添加备注",
+                )));
             }
             if self.selected_option_index().is_some() && notes_visible {
-                tips.push(FooterTip::new("tab or esc to clear notes"));
+                tips.push(FooterTip::new(t(
+                    "tab or esc to clear notes",
+                    "tab 或 esc 清除备注",
+                )));
             }
         }
 
         let question_count = self.question_count();
         let is_last_question = self.current_index().saturating_add(1) >= question_count;
         let enter_tip = if question_count == 1 {
-            FooterTip::highlighted("enter to submit answer")
+            FooterTip::highlighted(t("enter to submit answer", "enter 提交答案"))
         } else if is_last_question {
-            FooterTip::highlighted("enter to submit all")
+            FooterTip::highlighted(t("enter to submit all", "enter 提交全部"))
         } else {
-            FooterTip::new("enter to submit answer")
+            FooterTip::new(t("enter to submit answer", "enter 提交答案"))
         };
         tips.push(enter_tip);
         if question_count > 1 {
             if self.has_options() && !self.focus_is_notes() {
-                tips.push(FooterTip::new("←/→ to navigate questions"));
+                tips.push(FooterTip::new(t(
+                    "←/→ to navigate questions",
+                    "←/→ 切换问题",
+                )));
             } else if !self.has_options() {
-                tips.push(FooterTip::new("ctrl + p / ctrl + n change question"));
+                tips.push(FooterTip::new(t(
+                    "ctrl + p / ctrl + n change question",
+                    "ctrl + p / ctrl + n 切换问题",
+                )));
             }
         }
         if !(self.has_options() && notes_visible) {
-            tips.push(FooterTip::new("esc to interrupt"));
+            tips.push(FooterTip::new(t("esc to interrupt", "按 esc 中断")));
         }
         tips
     }
@@ -607,7 +627,7 @@ impl RequestUserInputOverlay {
             return options.get(idx).map(|opt| opt.label.clone());
         }
         if idx == options.len() && Self::other_option_enabled_for_question(question) {
-            return Some(OTHER_OPTION_LABEL.to_string());
+            return Some(t(OTHER_OPTION_LABEL, "以上都不是").to_string());
         }
         None
     }
@@ -785,12 +805,16 @@ impl RequestUserInputOverlay {
 
     fn unanswered_submit_description(&self) -> String {
         let count = self.unanswered_question_count();
-        let suffix = if count == 1 {
-            UNANSWERED_CONFIRM_SUBMIT_DESC_SINGULAR
+        if crate::is_zh_locale() {
+            format!("仍有 {count} 个未回答问题。")
         } else {
-            UNANSWERED_CONFIRM_SUBMIT_DESC_PLURAL
-        };
-        format!("Submit with {count} unanswered {suffix}.")
+            let suffix = if count == 1 {
+                UNANSWERED_CONFIRM_SUBMIT_DESC_SINGULAR
+            } else {
+                UNANSWERED_CONFIRM_SUBMIT_DESC_PLURAL
+            };
+            format!("Submit with {count} unanswered {suffix}.")
+        }
     }
 
     fn first_unanswered_index(&self) -> Option<usize> {
@@ -811,12 +835,12 @@ impl RequestUserInputOverlay {
             .unwrap_or(0);
         let entries = [
             (
-                UNANSWERED_CONFIRM_SUBMIT,
+                t(UNANSWERED_CONFIRM_SUBMIT, "继续提交"),
                 self.unanswered_submit_description(),
             ),
             (
-                UNANSWERED_CONFIRM_GO_BACK,
-                UNANSWERED_CONFIRM_GO_BACK_DESC.to_string(),
+                t(UNANSWERED_CONFIRM_GO_BACK, "返回"),
+                t(UNANSWERED_CONFIRM_GO_BACK_DESC, "返回第一个未回答的问题。").to_string(),
             ),
         ];
         entries
@@ -1314,21 +1338,49 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question: "Choose an option.".to_string(),
+            question: if crate::is_zh_locale() {
+                "选择一个选项。".to_string()
+            } else {
+                "Choose an option.".to_string()
+            },
             is_other: false,
             is_secret: false,
             options: Some(vec![
                 RequestUserInputQuestionOption {
-                    label: "Option 1".to_string(),
-                    description: "First choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 1".to_string()
+                    } else {
+                        "Option 1".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第一个选项。".to_string()
+                    } else {
+                        "First choice.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Option 2".to_string(),
-                    description: "Second choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 2".to_string()
+                    } else {
+                        "Option 2".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第二个选项。".to_string()
+                    } else {
+                        "Second choice.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Option 3".to_string(),
-                    description: "Third choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 3".to_string()
+                    } else {
+                        "Option 3".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第三个选项。".to_string()
+                    } else {
+                        "Third choice.".to_string()
+                    },
                 },
             ]),
         }
@@ -1338,21 +1390,49 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question: "Choose an option.".to_string(),
+            question: if crate::is_zh_locale() {
+                "选择一个选项。".to_string()
+            } else {
+                "Choose an option.".to_string()
+            },
             is_other: true,
             is_secret: false,
             options: Some(vec![
                 RequestUserInputQuestionOption {
-                    label: "Option 1".to_string(),
-                    description: "First choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 1".to_string()
+                    } else {
+                        "Option 1".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第一个选项。".to_string()
+                    } else {
+                        "First choice.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Option 2".to_string(),
-                    description: "Second choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 2".to_string()
+                    } else {
+                        "Option 2".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第二个选项。".to_string()
+                    } else {
+                        "Second choice.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Option 3".to_string(),
-                    description: "Third choice.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "选项 3".to_string()
+                    } else {
+                        "Option 3".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "第三个选项。".to_string()
+                    } else {
+                        "Third choice.".to_string()
+                    },
                 },
             ]),
         }
@@ -1362,27 +1442,52 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question: "Choose the next step for this task.".to_string(),
+            question: if crate::is_zh_locale() {
+                "为此任务选择下一步。".to_string()
+            } else {
+                "Choose the next step for this task.".to_string()
+            },
             is_other: false,
             is_secret: false,
             options: Some(vec![
                 RequestUserInputQuestionOption {
-                    label: "Discuss a code change".to_string(),
-                    description:
+                    label: if crate::is_zh_locale() {
+                        "讨论代码改动".to_string()
+                    } else {
+                        "Discuss a code change".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "先梳理计划，再一起实现，并进行仔细检查。".to_string()
+                    } else {
                         "Walk through a plan, then implement it together with careful checks."
-                            .to_string(),
+                            .to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Run targeted tests".to_string(),
-                    description:
+                    label: if crate::is_zh_locale() {
+                        "运行针对性测试".to_string()
+                    } else {
+                        "Run targeted tests".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "选择最相关的 crate，先验证当前行为。".to_string()
+                    } else {
                         "Pick the most relevant crate and validate the current behavior first."
-                            .to_string(),
+                            .to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Review the diff".to_string(),
-                    description:
+                    label: if crate::is_zh_locale() {
+                        "审查差异".to_string()
+                    } else {
+                        "Review the diff".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "总结更改并强调最重要的风险与空缺。".to_string()
+                    } else {
                         "Summarize the changes and highlight the most important risks and gaps."
-                            .to_string(),
+                            .to_string()
+                    },
                 },
             ]),
         }
@@ -1392,17 +1497,37 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question: "Choose one option.".to_string(),
+            question: if crate::is_zh_locale() {
+                "请选择一个选项。".to_string()
+            } else {
+                "Choose one option.".to_string()
+            },
             is_other: false,
             is_secret: false,
             options: Some(vec![
                 RequestUserInputQuestionOption {
-                    label: "Job: running/completed/failed/expired; Run/Experiment: succeeded/failed/unknown (Recommended when triaging long-running background work and status transitions)".to_string(),
-                    description: "Keep async job statuses for progress tracking and include enough context for debugging retries, stale workers, and unexpected expiration paths.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "Job：运行中/已完成/失败/已过期；Run/Experiment：成功/失败/未知（建议用于排查长时间后台任务与状态流转）".to_string()
+                    } else {
+                        "Job: running/completed/failed/expired; Run/Experiment: succeeded/failed/unknown (Recommended when triaging long-running background work and status transitions)".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "保留异步任务状态用于进度追踪，并包含足够上下文以排查重试、过期工作进程和意外过期路径。".to_string()
+                    } else {
+                        "Keep async job statuses for progress tracking and include enough context for debugging retries, stale workers, and unexpected expiration paths.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Add a short status model".to_string(),
-                    description: "Simpler labels with less detail for quick rollouts.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "添加简短状态模型".to_string()
+                    } else {
+                        "Add a short status model".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "更简洁的标签与更少细节，便于快速发布。".to_string()
+                    } else {
+                        "Simpler labels with less detail for quick rollouts.".to_string()
+                    },
                 },
             ]),
         }
@@ -1412,28 +1537,62 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question:
+            question: if crate::is_zh_locale() {
+                "请选择一个选项；每条提示都刻意很长，用于测试换行滚动。".to_string()
+            } else {
                 "Choose one option; each hint is intentionally very long to test wrapped scrolling."
-                    .to_string(),
+                    .to_string()
+            },
             is_other: false,
             is_secret: false,
             options: Some(vec![
                 RequestUserInputQuestionOption {
-                    label: "Use Detailed Hint A (Recommended)".to_string(),
-                    description: "Select this if you want a deliberately overextended explanatory hint that reads like a miniature specification, including context, rationale, expected behavior, and an explicit statement that this choice is mainly for testing how gracefully the interface wraps, truncates, and preserves readability under unusually verbose helper text conditions.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "使用详细提示 A（推荐）".to_string()
+                    } else {
+                        "Use Detailed Hint A (Recommended)".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "如果你想要一段刻意拉长的说明性提示，读起来像一份迷你规格说明，包含背景、理由、期望行为，并明确说明该选择主要用于测试界面在异常冗长的提示文本下如何换行、截断并保持可读性，请选择此项。".to_string()
+                    } else {
+                        "Select this if you want a deliberately overextended explanatory hint that reads like a miniature specification, including context, rationale, expected behavior, and an explicit statement that this choice is mainly for testing how gracefully the interface wraps, truncates, and preserves readability under unusually verbose helper text conditions.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Use Detailed Hint B".to_string(),
-                    description: "Select this if you want an equally verbose but differently phrased guidance block that emphasizes user-facing clarity, spacing tolerance, multiline wrapping, visual hierarchy interactions, and whether long descriptive metadata remains understandable when scanned quickly in a constrained layout where cognitive load is already high.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "使用详细提示 B".to_string()
+                    } else {
+                        "Use Detailed Hint B".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "如果你需要一段同样冗长但措辞不同的引导说明，强调面向用户的清晰度、留白容错、多行换行、视觉层级互动，以及在布局受限、认知负荷较高时长描述信息是否仍可快速理解，请选择此项。".to_string()
+                    } else {
+                        "Select this if you want an equally verbose but differently phrased guidance block that emphasizes user-facing clarity, spacing tolerance, multiline wrapping, visual hierarchy interactions, and whether long descriptive metadata remains understandable when scanned quickly in a constrained layout where cognitive load is already high.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "Use Detailed Hint C".to_string(),
-                    description: "Select this when you specifically want to verify that navigating downward will keep the currently highlighted option visible, even when previous options consume many wrapped lines and would otherwise push the selection out of the viewport.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "使用详细提示 C".to_string()
+                    } else {
+                        "Use Detailed Hint C".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "当你特别想验证向下导航时，当前高亮选项仍能保持可见，即便前面的选项占用了多行并可能将选中项推出视口，请选择此项。".to_string()
+                    } else {
+                        "Select this when you specifically want to verify that navigating downward will keep the currently highlighted option visible, even when previous options consume many wrapped lines and would otherwise push the selection out of the viewport.".to_string()
+                    },
                 },
                 RequestUserInputQuestionOption {
-                    label: "None of the above".to_string(),
-                    description:
-                        "Use this only if the previous long-form options do not apply.".to_string(),
+                    label: if crate::is_zh_locale() {
+                        "以上都不适用".to_string()
+                    } else {
+                        "None of the above".to_string()
+                    },
+                    description: if crate::is_zh_locale() {
+                        "仅当之前的长文本选项都不适用时使用。".to_string()
+                    } else {
+                        "Use this only if the previous long-form options do not apply.".to_string()
+                    },
                 },
             ]),
         }
@@ -1443,7 +1602,11 @@ mod tests {
         RequestUserInputQuestion {
             id: id.to_string(),
             header: header.to_string(),
-            question: "Share details.".to_string(),
+            question: if crate::is_zh_locale() {
+                "请补充细节。".to_string()
+            } else {
+                "Share details.".to_string()
+            },
             is_other: false,
             is_secret: false,
             options: None,
@@ -1572,7 +1735,14 @@ mod tests {
             panic!("expected UserInputAnswer");
         };
         let answer = response.answers.get("q1").expect("answer missing");
-        assert_eq!(answer.answers, vec!["Option 1".to_string()]);
+        assert_eq!(
+            answer.answers,
+            vec![if crate::is_zh_locale() {
+                "选项 1".to_string()
+            } else {
+                "Option 1".to_string()
+            }]
+        );
     }
 
     #[test]
@@ -1611,13 +1781,21 @@ mod tests {
         expected.insert(
             "q1".to_string(),
             RequestUserInputAnswer {
-                answers: vec!["Option 1".to_string()],
+                answers: vec![if crate::is_zh_locale() {
+                    "选项 1".to_string()
+                } else {
+                    "Option 1".to_string()
+                }],
             },
         );
         expected.insert(
             "q2".to_string(),
             RequestUserInputAnswer {
-                answers: vec!["Option 1".to_string()],
+                answers: vec![if crate::is_zh_locale() {
+                    "选项 1".to_string()
+                } else {
+                    "Option 1".to_string()
+                }],
             },
         );
         assert_eq!(response.answers, expected);
@@ -1641,7 +1819,14 @@ mod tests {
             panic!("expected UserInputAnswer");
         };
         let answer = response.answers.get("q1").expect("answer missing");
-        assert_eq!(answer.answers, vec!["Option 2".to_string()]);
+        assert_eq!(
+            answer.answers,
+            vec![if crate::is_zh_locale() {
+                "选项 2".to_string()
+            } else {
+                "Option 2".to_string()
+            }]
+        );
     }
 
     #[test]
@@ -1761,10 +1946,10 @@ mod tests {
         assert_eq!(
             tip_texts,
             vec![
-                "tab to add notes",
-                "enter to submit answer",
-                "←/→ to navigate questions",
-                "esc to interrupt",
+                t("tab to add notes", "tab 添加备注"),
+                t("enter to submit answer", "enter 提交答案"),
+                t("←/→ to navigate questions", "←/→ 切换问题"),
+                t("esc to interrupt", "按 esc 中断"),
             ]
         );
 
@@ -1773,7 +1958,10 @@ mod tests {
         let tip_texts = tips.iter().map(|tip| tip.text.as_str()).collect::<Vec<_>>();
         assert_eq!(
             tip_texts,
-            vec!["tab or esc to clear notes", "enter to submit answer",]
+            vec![
+                t("tab or esc to clear notes", "tab 或 esc 清除备注"),
+                t("enter to submit answer", "enter 提交答案"),
+            ]
         );
     }
 
@@ -1800,9 +1988,12 @@ mod tests {
         assert_eq!(
             tip_texts,
             vec![
-                "enter to submit all",
-                "ctrl + p / ctrl + n change question",
-                "esc to interrupt",
+                t("enter to submit all", "enter 提交全部"),
+                t(
+                    "ctrl + p / ctrl + n change question",
+                    "ctrl + p / ctrl + n 切换问题"
+                ),
+                t("esc to interrupt", "按 esc 中断"),
             ]
         );
     }
@@ -1867,9 +2058,15 @@ mod tests {
             false,
         );
 
-        overlay
-            .composer
-            .set_text_content("freeform notes".to_string(), Vec::new(), Vec::new());
+        overlay.composer.set_text_content(
+            if crate::is_zh_locale() {
+                "自由备注".to_string()
+            } else {
+                "freeform notes".to_string()
+            },
+            Vec::new(),
+            Vec::new(),
+        );
         overlay.composer.move_cursor_to_end();
 
         overlay.move_question(true);
@@ -1893,7 +2090,14 @@ mod tests {
         let answer = response.answers.get("q1").expect("answer missing");
         assert_eq!(answer.answers, Vec::<String>::new());
         let answer = response.answers.get("q2").expect("answer missing");
-        assert_eq!(answer.answers, vec!["Option 1".to_string()]);
+        assert_eq!(
+            answer.answers,
+            vec![if crate::is_zh_locale() {
+                "选项 1".to_string()
+            } else {
+                "Option 1".to_string()
+            }]
+        );
     }
 
     #[test]
@@ -2278,9 +2482,15 @@ mod tests {
             answer.options_state.selected_idx = Some(1);
         }
         overlay.select_current_option(false);
-        overlay
-            .composer
-            .set_text_content("Notes for option 2".to_string(), Vec::new(), Vec::new());
+        overlay.composer.set_text_content(
+            if crate::is_zh_locale() {
+                "选项 2 的备注".to_string()
+            } else {
+                "Notes for option 2".to_string()
+            },
+            Vec::new(),
+            Vec::new(),
+        );
         overlay.composer.move_cursor_to_end();
         let draft = overlay.capture_composer_draft();
         if let Some(answer) = overlay.current_answer_mut() {
@@ -2298,8 +2508,16 @@ mod tests {
         assert_eq!(
             answer.answers,
             vec![
-                "Option 2".to_string(),
-                "user_note: Notes for option 2".to_string(),
+                if crate::is_zh_locale() {
+                    "选项 2".to_string()
+                } else {
+                    "Option 2".to_string()
+                },
+                if crate::is_zh_locale() {
+                    "user_note: 选项 2 的备注".to_string()
+                } else {
+                    "user_note: Notes for option 2".to_string()
+                },
             ]
         );
     }
@@ -2352,10 +2570,21 @@ mod tests {
 
         let rows = overlay.option_rows();
         let other_row = rows.last().expect("expected none-of-the-above row");
-        assert_eq!(other_row.name, "  4. None of the above");
+        assert_eq!(
+            other_row.name,
+            if crate::is_zh_locale() {
+                "  4. 以上都不是"
+            } else {
+                "  4. None of the above"
+            }
+        );
         assert_eq!(
             other_row.description.as_deref(),
-            Some(OTHER_OPTION_DESCRIPTION)
+            Some(if crate::is_zh_locale() {
+                "（可选）在备注中补充细节（tab）。"
+            } else {
+                OTHER_OPTION_DESCRIPTION
+            })
         );
 
         let other_idx = overlay.options_len().saturating_sub(1);
@@ -2383,7 +2612,11 @@ mod tests {
         assert_eq!(
             answer.answers,
             vec![
-                OTHER_OPTION_LABEL.to_string(),
+                if crate::is_zh_locale() {
+                    "以上都不是".to_string()
+                } else {
+                    OTHER_OPTION_LABEL.to_string()
+                },
                 "user_note: Custom answer".to_string(),
             ]
         );
@@ -2711,30 +2944,78 @@ mod tests {
                 "turn-1",
                 vec![RequestUserInputQuestion {
                     id: "q1".to_string(),
-                    header: "Next Step".to_string(),
-                    question: "What would you like to do next?".to_string(),
+                    header: if crate::is_zh_locale() {
+                        "下一步".to_string()
+                    } else {
+                        "Next Step".to_string()
+                    },
+                    question: if crate::is_zh_locale() {
+                        "你接下来想做什么？".to_string()
+                    } else {
+                        "What would you like to do next?".to_string()
+                    },
                     is_other: false,
                     is_secret: false,
                     options: Some(vec![
                         RequestUserInputQuestionOption {
-                            label: "Discuss a code change (Recommended)".to_string(),
-                            description: "Walk through a plan and edit code together.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "讨论代码改动（推荐）".to_string()
+                            } else {
+                                "Discuss a code change (Recommended)".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "先梳理计划，再一起修改代码。".to_string()
+                            } else {
+                                "Walk through a plan and edit code together.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Run tests".to_string(),
-                            description: "Pick a crate and run its tests.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "运行测试".to_string()
+                            } else {
+                                "Run tests".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "选择一个 crate 并运行其测试。".to_string()
+                            } else {
+                                "Pick a crate and run its tests.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Review a diff".to_string(),
-                            description: "Summarize or review current changes.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "审查差异".to_string()
+                            } else {
+                                "Review a diff".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "总结或审查当前更改。".to_string()
+                            } else {
+                                "Summarize or review current changes.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Refactor".to_string(),
-                            description: "Tighten structure and remove dead code.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "重构".to_string()
+                            } else {
+                                "Refactor".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "优化结构并移除死代码。".to_string()
+                            } else {
+                                "Tighten structure and remove dead code.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Ship it".to_string(),
-                            description: "Finalize and open a PR.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "发布".to_string()
+                            } else {
+                                "Ship it".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "定稿并提交 PR。".to_string()
+                            } else {
+                                "Finalize and open a PR.".to_string()
+                            },
                         },
                     ]),
                 }],
@@ -2763,30 +3044,78 @@ mod tests {
                 "turn-1",
                 vec![RequestUserInputQuestion {
                     id: "q1".to_string(),
-                    header: "Next Step".to_string(),
-                    question: "What would you like to do next?".to_string(),
+                    header: if crate::is_zh_locale() {
+                        "下一步".to_string()
+                    } else {
+                        "Next Step".to_string()
+                    },
+                    question: if crate::is_zh_locale() {
+                        "你接下来想做什么？".to_string()
+                    } else {
+                        "What would you like to do next?".to_string()
+                    },
                     is_other: false,
                     is_secret: false,
                     options: Some(vec![
                         RequestUserInputQuestionOption {
-                            label: "Discuss a code change (Recommended)".to_string(),
-                            description: "Walk through a plan and edit code together.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "讨论代码改动（推荐）".to_string()
+                            } else {
+                                "Discuss a code change (Recommended)".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "先梳理计划，再一起修改代码。".to_string()
+                            } else {
+                                "Walk through a plan and edit code together.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Run tests".to_string(),
-                            description: "Pick a crate and run its tests.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "运行测试".to_string()
+                            } else {
+                                "Run tests".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "选择一个 crate 并运行其测试。".to_string()
+                            } else {
+                                "Pick a crate and run its tests.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Review a diff".to_string(),
-                            description: "Summarize or review current changes.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "审查差异".to_string()
+                            } else {
+                                "Review a diff".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "总结或审查当前更改。".to_string()
+                            } else {
+                                "Summarize or review current changes.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Refactor".to_string(),
-                            description: "Tighten structure and remove dead code.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "重构".to_string()
+                            } else {
+                                "Refactor".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "优化结构并移除死代码。".to_string()
+                            } else {
+                                "Tighten structure and remove dead code.".to_string()
+                            },
                         },
                         RequestUserInputQuestionOption {
-                            label: "Ship it".to_string(),
-                            description: "Finalize and open a PR.".to_string(),
+                            label: if crate::is_zh_locale() {
+                                "发布".to_string()
+                            } else {
+                                "Ship it".to_string()
+                            },
+                            description: if crate::is_zh_locale() {
+                                "定稿并提交 PR。".to_string()
+                            } else {
+                                "Finalize and open a PR.".to_string()
+                            },
                         },
                     ]),
                 }],

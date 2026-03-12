@@ -3,11 +3,11 @@ source: tui/src/bottom_pane/request_user_input/mod.rs
 expression: "render_snapshot(&overlay, area)"
 ---
                                                                                                                         
-  Question 1/1 (1 unanswered)                                                                                           
-  Share details.                                                                                                        
+  问题 1/1（1 未回答）                                                                                                  
+  请补充细节。                                                                                                          
                                                                                                                         
-  › Type your answer (optional)                                                                                         
+  › 输入你的回答（可选）                                                                                                
                                                                                                                         
                                                                                                                         
                                                                                                                         
-  enter to submit answer | esc to interrupt
+  enter 提交答案 | 按 esc 中断

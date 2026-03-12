@@ -4414,7 +4414,11 @@ impl ChatComposer {
             } else {
                 self.input_disabled_placeholder
                     .as_deref()
-                    .unwrap_or("Input disabled.")
+                    .unwrap_or(if crate::is_zh_locale() {
+                        "输入已禁用。"
+                    } else {
+                        "Input disabled."
+                    })
                     .to_string()
             };
             if !textarea_rect.is_empty() {
@@ -4520,7 +4524,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -4539,7 +4543,12 @@ mod tests {
         let mut hint_row: Option<(u16, String)> = None;
         for y in 0..area.height {
             let row = row_to_string(y);
-            if row.contains("? for shortcuts") {
+            let hint_text = if crate::is_zh_locale() {
+                "? 查看快捷键"
+            } else {
+                "? for shortcuts"
+            };
+            if row.contains(hint_text) {
                 hint_row = Some((y, row));
                 break;
             }
@@ -4574,7 +4583,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_footer_hint_override(Some(vec![("K".to_string(), "label".to_string())]));
@@ -4612,7 +4621,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_footer_hint_override(Some(vec![("K".to_string(), "label".to_string())]));
@@ -4661,7 +4670,7 @@ mod tests {
             true,
             sender,
             enhanced_keys_supported,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         setup(&mut composer);
@@ -4922,7 +4931,7 @@ mod tests {
             true,
             sender,
             true,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -4949,7 +4958,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -4972,7 +4981,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -4998,7 +5007,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5060,7 +5069,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5103,7 +5112,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let remote_image_url = "https://example.com/one.png".to_string();
@@ -5145,7 +5154,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5188,7 +5197,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5230,7 +5239,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5259,7 +5268,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_connectors_enabled(true);
@@ -5301,7 +5310,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_text_content("$".to_string(), Vec::new(), Vec::new());
@@ -5408,7 +5417,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_connectors_enabled(true);
@@ -5446,7 +5455,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5696,7 +5705,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5731,7 +5740,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5762,7 +5771,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5786,7 +5795,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5819,7 +5828,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5867,7 +5876,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5904,7 +5913,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5958,7 +5967,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -5987,7 +5996,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6022,7 +6031,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6055,7 +6064,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6084,7 +6093,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6113,7 +6122,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6147,7 +6156,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_steer_enabled(true);
@@ -6175,7 +6184,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_steer_enabled(true);
@@ -6217,7 +6226,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_steer_enabled(false);
@@ -6262,7 +6271,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6303,7 +6312,7 @@ mod tests {
                 true,
                 sender.clone(),
                 false,
-                "Ask Codex to do anything".to_string(),
+                crate::ui_consts::default_composer_placeholder().to_string(),
                 false,
             );
 
@@ -6395,7 +6404,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6423,7 +6432,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         type_chars_humanlike(&mut composer, &['/', 'm', 'o']);
@@ -6454,7 +6463,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6479,7 +6488,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         type_chars_humanlike(&mut composer, &['/', 'r', 'e', 's']);
@@ -6535,7 +6544,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6578,7 +6587,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_steer_enabled(true);
@@ -6612,7 +6621,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.textarea.insert_str("restore me");
@@ -6655,7 +6664,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_task_running(true);
@@ -6708,7 +6717,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             true,
         );
         composer.set_text_content("x".to_string(), Vec::new(), Vec::new());
@@ -6737,7 +6746,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_voice_transcription_enabled(true);
@@ -6769,7 +6778,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_voice_transcription_enabled(true);
@@ -6803,7 +6812,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_voice_transcription_enabled(true);
@@ -6837,7 +6846,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6864,7 +6873,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6934,7 +6943,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6955,7 +6964,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -6993,7 +7002,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_collaboration_modes_enabled(true);
@@ -7015,7 +7024,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_collaboration_modes_enabled(true);
@@ -7036,7 +7045,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7068,7 +7077,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7096,7 +7105,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_task_running(false);
@@ -7125,7 +7134,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7166,7 +7175,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_collaboration_modes_enabled(true);
@@ -7204,7 +7213,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7261,7 +7270,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7340,7 +7349,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7414,7 +7423,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7453,7 +7462,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7493,7 +7502,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7541,7 +7550,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let path = PathBuf::from("/tmp/image1.png");
@@ -7579,7 +7588,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7612,7 +7621,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let remote_image_url = "https://example.com/remote.png".to_string();
@@ -7646,7 +7655,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let remote_image_urls = vec![
@@ -7678,7 +7687,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7721,7 +7730,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7743,7 +7752,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7786,7 +7795,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7829,7 +7838,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7872,7 +7881,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -7918,7 +7927,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let path = PathBuf::from("/tmp/image2.png");
@@ -7957,7 +7966,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let path = PathBuf::from("/tmp/image_dup.png");
@@ -7980,7 +7989,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         let path = PathBuf::from("/tmp/image3.png");
@@ -8020,7 +8029,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8046,7 +8055,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8106,7 +8115,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8169,7 +8178,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8207,7 +8216,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8229,7 +8238,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8268,7 +8277,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8303,7 +8312,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8342,7 +8351,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8397,7 +8406,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8453,7 +8462,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8501,7 +8510,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8565,7 +8574,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8623,7 +8632,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8659,7 +8668,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8691,7 +8700,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8741,7 +8750,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8796,7 +8805,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8834,7 +8843,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8872,7 +8881,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8915,7 +8924,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8955,7 +8964,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -8996,7 +9005,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
         composer.set_steer_enabled(true);
@@ -9079,7 +9088,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9115,7 +9124,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9151,7 +9160,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9189,7 +9198,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9232,7 +9241,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9261,7 +9270,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9308,7 +9317,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9347,7 +9356,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9372,7 +9381,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9402,7 +9411,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9445,7 +9454,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9479,7 +9488,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9504,7 +9513,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9532,7 +9541,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9557,7 +9566,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9585,7 +9594,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9606,7 +9615,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9628,7 +9637,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9665,7 +9674,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9685,7 +9694,7 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
@@ -9724,12 +9733,22 @@ mod tests {
             true,
             sender,
             false,
-            "Ask Codex to do anything".to_string(),
+            crate::ui_consts::default_composer_placeholder().to_string(),
             false,
         );
 
         composer.set_text_content("hello".to_string(), Vec::new(), Vec::new());
-        composer.set_input_enabled(false, Some("Input disabled for test.".to_string()));
+        composer.set_input_enabled(
+            false,
+            Some(
+                if crate::is_zh_locale() {
+                    "测试用：输入已禁用。"
+                } else {
+                    "Input disabled for test."
+                }
+                .to_string(),
+            ),
+        );
 
         let (result, needs_redraw) =
             composer.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));

@@ -14,15 +14,10 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }
@@ -227,9 +222,7 @@ fn missing_device_error(kind: RealtimeAudioDeviceKind, configured_name: Option<&
     match (kind, configured_name) {
         (RealtimeAudioDeviceKind::Microphone, Some(name)) => {
             if is_zh_locale() {
-                format!(
-                    "配置的麦克风 `{name}` 不可用，且未找到默认输入音频设备"
-                )
+                format!("配置的麦克风 `{name}` 不可用，且未找到默认输入音频设备")
             } else {
                 format!(
                     "configured microphone `{name}` was unavailable and no default input audio device was found"
@@ -238,9 +231,7 @@ fn missing_device_error(kind: RealtimeAudioDeviceKind, configured_name: Option<&
         }
         (RealtimeAudioDeviceKind::Speaker, Some(name)) => {
             if is_zh_locale() {
-                format!(
-                    "配置的扬声器 `{name}` 不可用，且未找到默认输出音频设备"
-                )
+                format!("配置的扬声器 `{name}` 不可用，且未找到默认输出音频设备")
             } else {
                 format!(
                     "configured speaker `{name}` was unavailable and no default output audio device was found"

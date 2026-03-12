@@ -3,7 +3,7 @@ source: tui/src/bottom_pane/mcp_server_elicitation.rs
 expression: "render_snapshot(&overlay, Rect::new(0, 0, 120, 16))"
 ---
                                                                                                                         
-  Field 1/1 (1 required unanswered)                                                                                     
+  字段 1/1（1 个必答未完成）                                                                                              
   Allow this request?                                                                                                   
                                                                                                                         
   Confirm                                                                                                               
@@ -16,4 +16,4 @@ expression: "render_snapshot(&overlay, Rect::new(0, 0, 120, 16))"
                                                                                                                         
                                                                                                                         
                                                                                                                         
-  enter to submit | esc to cancel
+  回车提交全部 | Esc 取消                                                                                                

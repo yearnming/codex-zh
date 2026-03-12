@@ -364,9 +364,17 @@ impl ListSelectionView {
                     let prefix = if is_selected { '›' } else { ' ' };
                     let name = item.name.as_str();
                     let marker = if item.is_current {
-                        " (current)"
+                        if crate::is_zh_locale() {
+                            "（当前）"
+                        } else {
+                            " (current)"
+                        }
                     } else if item.is_default {
-                        " (default)"
+                        if crate::is_zh_locale() {
+                            "（默认）"
+                        } else {
+                            " (default)"
+                        }
                     } else {
                         ""
                     };
@@ -833,10 +841,12 @@ impl Renderable for ListSelectionView {
             let [header_area, elision_area] =
                 Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(header_area);
             self.header.render(header_area, buf);
-            Paragraph::new(vec![
-                Line::from(format!("[… {header_height} lines] ctrl + a view all")).dim(),
-            ])
-            .render(elision_area, buf);
+            let elision_line = if crate::is_zh_locale() {
+                format!("[… {header_height} 行] Ctrl + A 查看全部")
+            } else {
+                format!("[… {header_height} lines] ctrl + a view all")
+            };
+            Paragraph::new(vec![Line::from(elision_line).dim()]).render(elision_area, buf);
         } else {
             self.header.render(header_area, buf);
         }
@@ -863,6 +873,11 @@ impl Renderable for ListSelectionView {
                 width: effective_rows_width.max(1),
                 height: list_area.height,
             };
+            let no_matches_label = if crate::is_zh_locale() {
+                "没有匹配结果"
+            } else {
+                "no matches"
+            };
             match self.col_width_mode {
                 ColumnWidthMode::AutoVisible => render_rows(
                     render_area,
@@ -870,7 +885,7 @@ impl Renderable for ListSelectionView {
                     &rows,
                     &self.state,
                     render_area.height as usize,
-                    "no matches",
+                    no_matches_label,
                 ),
                 ColumnWidthMode::AutoAllRows => render_rows_stable_col_widths(
                     render_area,
@@ -878,7 +893,7 @@ impl Renderable for ListSelectionView {
                     &rows,
                     &self.state,
                     render_area.height as usize,
-                    "no matches",
+                    no_matches_label,
                 ),
                 ColumnWidthMode::Fixed => render_rows_with_col_width_mode(
                     render_area,
@@ -886,7 +901,7 @@ impl Renderable for ListSelectionView {
                     &rows,
                     &self.state,
                     render_area.height as usize,
-                    "no matches",
+                    no_matches_label,
                     ColumnWidthMode::Fixed,
                 ),
             };
@@ -1044,15 +1059,15 @@ mod tests {
         let tx = AppEventSender::new(tx_raw);
         let items = vec![
             SelectionItem {
-                name: "Read Only".to_string(),
-                description: Some("Codex can read files".to_string()),
+                name: "只读".to_string(),
+                description: Some("Codex 可读取文件".to_string()),
                 is_current: true,
                 dismiss_on_select: true,
                 ..Default::default()
             },
             SelectionItem {
-                name: "Full Access".to_string(),
-                description: Some("Codex can edit files".to_string()),
+                name: "完全访问".to_string(),
+                description: Some("Codex 可编辑文件".to_string()),
                 is_current: false,
                 dismiss_on_select: true,
                 ..Default::default()
@@ -1060,7 +1075,7 @@ mod tests {
         ];
         ListSelectionView::new(
             SelectionViewParams {
-                title: Some("Select Approval Mode".to_string()),
+                title: Some("选择审批模式".to_string()),
                 subtitle: subtitle.map(str::to_string),
                 footer_hint: Some(standard_popup_hint_line()),
                 items,
@@ -1160,7 +1175,7 @@ mod tests {
 
     #[test]
     fn renders_blank_line_between_subtitle_and_items() {
-        let view = make_selection_view(Some("Switch between Codex approval presets"));
+        let view = make_selection_view(Some("在 Codex 审批预设之间切换"));
         assert_snapshot!("list_selection_spacing_with_subtitle", render_lines(&view));
     }
 
@@ -1175,7 +1190,12 @@ mod tests {
         let view = ListSelectionView::new(params, tx);
 
         let rendered = render_lines_in_area(&view, 94, 35);
-        assert!(rendered.contains("Move up/down to live preview themes"));
+        let expected = if crate::is_zh_locale() {
+            "上下移动可实时预览主题"
+        } else {
+            "Move up/down to live preview themes"
+        };
+        assert!(rendered.contains(expected));
     }
 
     #[test]
@@ -1235,20 +1255,20 @@ mod tests {
         let (tx_raw, _rx) = unbounded_channel::<AppEvent>();
         let tx = AppEventSender::new(tx_raw);
         let items = vec![SelectionItem {
-            name: "Read Only".to_string(),
-            description: Some("Codex can read files".to_string()),
+            name: "只读".to_string(),
+            description: Some("Codex 可读取文件".to_string()),
             is_current: true,
             dismiss_on_select: true,
             ..Default::default()
         }];
         let footer_note = Line::from(vec![
-            "Note: ".dim(),
+            "注意：".dim(),
             "Use /setup-default-sandbox".cyan(),
-            " to allow network access.".dim(),
+            " 以允许网络访问。".dim(),
         ]);
         let view = ListSelectionView::new(
             SelectionViewParams {
-                title: Some("Select Approval Mode".to_string()),
+                title: Some("选择审批模式".to_string()),
                 footer_note: Some(footer_note),
                 footer_hint: Some(standard_popup_hint_line()),
                 items,
@@ -1267,19 +1287,19 @@ mod tests {
         let (tx_raw, _rx) = unbounded_channel::<AppEvent>();
         let tx = AppEventSender::new(tx_raw);
         let items = vec![SelectionItem {
-            name: "Read Only".to_string(),
-            description: Some("Codex can read files".to_string()),
+            name: "只读".to_string(),
+            description: Some("Codex 可读取文件".to_string()),
             is_current: false,
             dismiss_on_select: true,
             ..Default::default()
         }];
         let mut view = ListSelectionView::new(
             SelectionViewParams {
-                title: Some("Select Approval Mode".to_string()),
+                title: Some("选择审批模式".to_string()),
                 footer_hint: Some(standard_popup_hint_line()),
                 items,
                 is_searchable: true,
-                search_placeholder: Some("Type to search branches".to_string()),
+                search_placeholder: Some("输入以搜索分支".to_string()),
                 ..Default::default()
             },
             tx,
@@ -1300,7 +1320,7 @@ mod tests {
         let mut view = ListSelectionView::new(
             SelectionViewParams {
                 items: vec![SelectionItem {
-                    name: "Read Only".to_string(),
+                    name: "只读".to_string(),
                     dismiss_on_select: true,
                     ..Default::default()
                 }],

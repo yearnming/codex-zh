@@ -111,17 +111,16 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
 }
 
 fn api_key_disabled_message() -> &'static str {
@@ -340,11 +339,19 @@ impl AuthModeWidget {
         let mut lines: Vec<Line> = vec![
             Line::from(vec![
                 "  ".into(),
-                "Sign in with ChatGPT to use Codex as part of your paid plan".into(),
+                t(
+                    "Sign in with ChatGPT to use Codex as part of your paid plan",
+                    "使用 ChatGPT 登录以在已付费计划中使用 Codex",
+                )
+                .into(),
             ]),
             Line::from(vec![
                 "  ".into(),
-                "or connect an API key for usage-based billing".into(),
+                t(
+                    "or connect an API key for usage-based billing",
+                    "或连接 API key 按用量计费",
+                )
+                .into(),
             ]),
             "".into(),
         ];
@@ -379,11 +386,17 @@ impl AuthModeWidget {
         };
 
         let chatgpt_description = if !self.is_chatgpt_login_allowed() {
-            "ChatGPT login is disabled"
+            t("ChatGPT login is disabled", "ChatGPT 登录已禁用")
         } else {
-            "Usage included with Plus, Pro, Business, and Enterprise plans"
+            t(
+                "Usage included with Plus, Pro, Business, and Enterprise plans",
+                "Plus、Pro、Business 与 Enterprise 计划包含使用额度",
+            )
         };
-        let device_code_description = "Sign in from another device with a one-time code";
+        let device_code_description = t(
+            "Sign in from another device with a one-time code",
+            "在另一台设备上使用一次性代码登录",
+        );
 
         for (idx, option) in self.displayed_sign_in_options().into_iter().enumerate() {
             match option {
@@ -391,7 +404,7 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Sign in with ChatGPT",
+                        t("Sign in with ChatGPT", "使用 ChatGPT 登录"),
                         chatgpt_description,
                     ));
                 }
@@ -399,7 +412,7 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Sign in with Device Code",
+                        t("Sign in with Device Code", "使用设备码登录"),
                         device_code_description,
                     ));
                 }
@@ -407,8 +420,8 @@ impl AuthModeWidget {
                     lines.extend(create_mode_item(
                         idx,
                         option,
-                        "Provide your own API key",
-                        "Pay for what you use",
+                        t("Provide your own API key", "使用自己的 API key"),
+                        t("Pay for what you use", "按用量付费"),
                     ));
                 }
             }
@@ -417,7 +430,10 @@ impl AuthModeWidget {
 
         if !self.is_api_login_allowed() {
             lines.push(
-                "  API key login is disabled by this workspace. Sign in with ChatGPT to continue."
+                t(
+                    "  API key login is disabled by this workspace. Sign in with ChatGPT to continue.",
+                    "  此工作区已禁用 API key 登录。请使用 ChatGPT 登录以继续。",
+                )
                     .dim()
                     .into(),
             );
@@ -426,7 +442,7 @@ impl AuthModeWidget {
         lines.push(
             // AE: Following styles.md, this should probably be Cyan because it's a user input tip.
             //     But leaving this for a future cleanup.
-            "  Press Enter to continue".dim().into(),
+            t("  Press Enter to continue", "  按回车继续").dim().into(),
         );
         if let Some(err) = &self.error {
             lines.push("".into());
@@ -444,9 +460,12 @@ impl AuthModeWidget {
             // Schedule a follow-up frame to keep the shimmer animation going.
             self.request_frame
                 .schedule_frame_in(std::time::Duration::from_millis(100));
-            spans.extend(shimmer_spans("Finish signing in via your browser"));
+            spans.extend(shimmer_spans(t(
+                "Finish signing in via your browser",
+                "在浏览器中完成登录",
+            )));
         } else {
-            spans.push("Finish signing in via your browser".into());
+            spans.push(t("Finish signing in via your browser", "在浏览器中完成登录").into());
         }
         let mut lines = vec![spans.into(), "".into()];
 
@@ -454,7 +473,13 @@ impl AuthModeWidget {
         let auth_url = if let SignInState::ChatGptContinueInBrowser(state) = &*sign_in_state
             && !state.auth_url.is_empty()
         {
-            lines.push("  If the link doesn't open automatically, open the following link to authenticate:".into());
+            lines.push(
+                t(
+                    "  If the link doesn't open automatically, open the following link to authenticate:",
+                    "  如果链接没有自动打开，请打开以下链接完成认证：",
+                )
+                .into(),
+            );
             lines.push("".into());
             lines.push(Line::from(vec![
                 "  ".into(),
@@ -462,8 +487,12 @@ impl AuthModeWidget {
             ]));
             lines.push("".into());
             lines.push(Line::from(vec![
-                "  On a remote or headless machine? Press Esc and choose ".into(),
-                "Sign in with Device Code".cyan(),
+                t(
+                    "  On a remote or headless machine? Press Esc and choose ",
+                    "  远程或无界面机器？按 Esc 并选择 ",
+                )
+                .into(),
+                t("Sign in with Device Code", "使用设备码登录").cyan(),
                 ".".into(),
             ]));
             lines.push("".into());
@@ -472,7 +501,7 @@ impl AuthModeWidget {
             None
         };
 
-        lines.push("  Press Esc to cancel".dim().into());
+        lines.push(t("  Press Esc to cancel", "  按 Esc 取消").dim().into());
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
             .render(area, buf);
@@ -485,29 +514,82 @@ impl AuthModeWidget {
     }
 
     fn render_chatgpt_success_message(&self, area: Rect, buf: &mut Buffer) {
+        let is_zh = is_zh_locale();
         let lines = vec![
-            "✓ Signed in with your ChatGPT account".fg(Color::Green).into(),
+            (if is_zh {
+                "✓ 已使用 ChatGPT 账号登录"
+            } else {
+                "✓ Signed in with your ChatGPT account"
+            })
+            .fg(Color::Green)
+            .into(),
             "".into(),
-            "  Before you start:".into(),
+            if is_zh {
+                "  开始之前：".into()
+            } else {
+                "  Before you start:".into()
+            },
             "".into(),
-            "  Decide how much autonomy you want to grant Codex".into(),
+            if is_zh {
+                "  决定授予 Codex 多少自主权限".into()
+            } else {
+                "  Decide how much autonomy you want to grant Codex".into()
+            },
             Line::from(vec![
-                "  For more details see the ".into(),
-                "\u{1b}]8;;https://developers.openai.com/codex/security\u{7}Codex docs\u{1b}]8;;\u{7}".underlined(),
+                if is_zh {
+                    "  更多详情请查看 ".into()
+                } else {
+                    "  For more details see the ".into()
+                },
+                if is_zh {
+                    "\u{1b}]8;;https://developers.openai.com/codex/security\u{7}Codex 文档\u{1b}]8;;\u{7}"
+                        .underlined()
+                } else {
+                    "\u{1b}]8;;https://developers.openai.com/codex/security\u{7}Codex docs\u{1b}]8;;\u{7}"
+                        .underlined()
+                },
             ])
             .dim(),
             "".into(),
-            "  Codex can make mistakes".into(),
-            "  Review the code it writes and commands it runs".dim().into(),
+            if is_zh {
+                "  Codex 可能会出错".into()
+            } else {
+                "  Codex can make mistakes".into()
+            },
+            if is_zh {
+                "  请检查它编写的代码和执行的命令".dim().into()
+            } else {
+                "  Review the code it writes and commands it runs".dim().into()
+            },
             "".into(),
-            "  Powered by your ChatGPT account".into(),
+            if is_zh {
+                "  由你的 ChatGPT 账号提供支持".into()
+            } else {
+                "  Powered by your ChatGPT account".into()
+            },
             Line::from(vec![
-                "  Uses your plan's rate limits and ".into(),
-                "\u{1b}]8;;https://chatgpt.com/#settings\u{7}training data preferences\u{1b}]8;;\u{7}".underlined(),
+                if is_zh {
+                    "  使用你计划的速率限制和 ".into()
+                } else {
+                    "  Uses your plan's rate limits and ".into()
+                },
+                if is_zh {
+                    "\u{1b}]8;;https://chatgpt.com/#settings\u{7}训练数据偏好设置\u{1b}]8;;\u{7}"
+                        .underlined()
+                } else {
+                    "\u{1b}]8;;https://chatgpt.com/#settings\u{7}training data preferences\u{1b}]8;;\u{7}"
+                        .underlined()
+                },
             ])
             .dim(),
             "".into(),
-            "  Press Enter to continue".fg(Color::Cyan).into(),
+            (if is_zh {
+                "  按回车继续"
+            } else {
+                "  Press Enter to continue"
+            })
+            .fg(Color::Cyan)
+            .into(),
         ];
 
         Paragraph::new(lines)
@@ -517,9 +599,13 @@ impl AuthModeWidget {
 
     fn render_chatgpt_success(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ Signed in with your ChatGPT account"
-                .fg(Color::Green)
-                .into(),
+            (if is_zh_locale() {
+                "✓ 已使用 ChatGPT 账号登录"
+            } else {
+                "✓ Signed in with your ChatGPT account"
+            })
+            .fg(Color::Green)
+            .into(),
         ];
 
         Paragraph::new(lines)
@@ -529,9 +615,19 @@ impl AuthModeWidget {
 
     fn render_api_key_configured(&self, area: Rect, buf: &mut Buffer) {
         let lines = vec![
-            "✓ API key configured".fg(Color::Green).into(),
+            (if is_zh_locale() {
+                "✓ 已配置 API key"
+            } else {
+                "✓ API key configured"
+            })
+            .fg(Color::Green)
+            .into(),
             "".into(),
-            "  Codex will use usage-based billing with your API key.".into(),
+            if is_zh_locale() {
+                "  Codex 将使用你的 API key 按用量计费。".into()
+            } else {
+                "  Codex will use usage-based billing with your API key.".into()
+            },
         ];
 
         Paragraph::new(lines)
@@ -550,18 +646,35 @@ impl AuthModeWidget {
         let mut intro_lines: Vec<Line> = vec![
             Line::from(vec![
                 "> ".into(),
-                "Use your own OpenAI API key for usage-based billing".bold(),
+                t(
+                    "Use your own OpenAI API key for usage-based billing",
+                    "使用自己的 OpenAI API key 按用量计费",
+                )
+                .bold(),
             ]),
             "".into(),
-            "  Paste or type your API key below. It will be stored locally in auth.json.".into(),
+            t(
+                "  Paste or type your API key below. It will be stored locally in auth.json.",
+                "  在下方粘贴或输入 API key。它会保存在本地 auth.json 中。",
+            )
+            .into(),
             "".into(),
         ];
         if state.prepopulated_from_env {
-            intro_lines.push("  Detected OPENAI_API_KEY environment variable.".into());
             intro_lines.push(
-                "  Paste a different key if you prefer to use another account."
-                    .dim()
-                    .into(),
+                t(
+                    "  Detected OPENAI_API_KEY environment variable.",
+                    "  检测到 OPENAI_API_KEY 环境变量。",
+                )
+                .into(),
+            );
+            intro_lines.push(
+                t(
+                    "  Paste a different key if you prefer to use another account.",
+                    "  如果想使用其他账号，请粘贴不同的 key。",
+                )
+                .dim()
+                .into(),
             );
             intro_lines.push("".into());
         }
@@ -570,7 +683,7 @@ impl AuthModeWidget {
             .render(intro_area, buf);
 
         let content_line: Line = if state.value.is_empty() {
-            vec!["Paste or type your API key".dim()].into()
+            vec![t("Paste or type your API key", "粘贴或输入 API key").dim()].into()
         } else {
             Line::from(state.value.clone())
         };
@@ -586,8 +699,8 @@ impl AuthModeWidget {
             .render(input_area, buf);
 
         let mut footer_lines: Vec<Line> = vec![
-            "  Press Enter to save".dim().into(),
-            "  Press Esc to go back".dim().into(),
+            t("  Press Enter to save", "  按回车保存").dim().into(),
+            t("  Press Esc to go back", "  按 Esc 返回").dim().into(),
         ];
         if let Some(error) = &self.error {
             footer_lines.push("".into());
@@ -912,7 +1025,7 @@ mod tests {
 
         widget.start_api_key_entry();
 
-        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE_EN));
+        assert_eq!(widget.error.as_deref(), Some(api_key_disabled_message()));
         assert!(matches!(
             &*widget.sign_in_state.read().unwrap(),
             SignInState::PickMode
@@ -925,7 +1038,7 @@ mod tests {
 
         widget.save_api_key("sk-test".to_string());
 
-        assert_eq!(widget.error.as_deref(), Some(API_KEY_DISABLED_MESSAGE_EN));
+        assert_eq!(widget.error.as_deref(), Some(api_key_disabled_message()));
         assert!(matches!(
             &*widget.sign_in_state.read().unwrap(),
             SignInState::PickMode

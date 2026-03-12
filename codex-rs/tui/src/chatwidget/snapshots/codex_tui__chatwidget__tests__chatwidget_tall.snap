@@ -3,9 +3,9 @@ source: tui/src/chatwidget/tests.rs
 expression: term.backend().vt100().screen().contents()
 ---
 
-• Working (0s • esc to interrupt)
+• 工作中 (0秒 • 按 esc 中断)
 
-• Queued follow-up messages
+• 已排队的后续消息
   ↳ Hello, world! 0
   ↳ Hello, world! 1
   ↳ Hello, world! 2
@@ -23,6 +23,6 @@ expression: term.backend().vt100().screen().contents()
   ↳ Hello, world! 14
   ↳ Hello, world! 15
 
-› Ask Codex to do anything
+› 让 Codex 做任何事
 
-  ? for shortcuts                                            100% context left
+  ? 查看快捷键                                            100% 剩余上下文

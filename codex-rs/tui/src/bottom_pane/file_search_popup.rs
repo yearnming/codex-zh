@@ -28,6 +28,10 @@ pub(crate) struct FileSearchPopup {
     state: ScrollState,
 }
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 impl FileSearchPopup {
     pub(crate) fn new() -> Self {
         Self {
@@ -135,9 +139,9 @@ impl WidgetRef for &FileSearchPopup {
         };
 
         let empty_message = if self.waiting {
-            "loading..."
+            t("loading...", "加载中...")
         } else {
-            "no matches"
+            t("no matches", "没有匹配结果")
         };
 
         render_rows(

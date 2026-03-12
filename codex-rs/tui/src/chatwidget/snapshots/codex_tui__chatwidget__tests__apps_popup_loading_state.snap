@@ -2,7 +2,7 @@
 source: tui/src/chatwidget/tests.rs
 expression: before
 ---
-  Apps
-  Loading installed and available apps...
+  应用
+  正在加载已安装和可用的应用...
 
-› 1. Loading apps...  This updates when the full list is ready.
+› 1. 正在加载应用...  完整列表就绪后会更新。

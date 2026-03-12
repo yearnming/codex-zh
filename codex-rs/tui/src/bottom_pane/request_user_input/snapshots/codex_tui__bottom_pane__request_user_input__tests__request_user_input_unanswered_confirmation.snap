@@ -3,13 +3,13 @@ source: tui/src/bottom_pane/request_user_input/mod.rs
 expression: "render_snapshot(&overlay, area)"
 ---
                                                                                 
-  Submit with unanswered questions?                                             
-  2 unanswered questions                                                        
+  还有未回答问题，仍要提交吗？                                                        
+  2 个未回答问题                                                                  
                                                                                 
-  › 1. Proceed  Submit with 2 unanswered questions.                             
-    2. Go back  Return to the first unanswered question.                        
-                                                                                
-                                                                                
+  › 1. 继续提交  仍有 2 个未回答问题。                                              
+    2. 返回  返回第一个未回答的问题。                                               
                                                                                 
                                                                                 
-  Press enter to confirm or esc to go back
+                                                                                
+                                                                                
+  按 enter 确认或按 esc 返回

@@ -19,6 +19,7 @@ use codex_login::run_device_code_login;
 use codex_login::run_login_server;
 use codex_protocol::config_types::ForcedLoginMethod;
 use codex_utils_cli::CliConfigOverrides;
+use std::env;
 use std::fs::OpenOptions;
 use std::io::IsTerminal;
 use std::io::Read;
@@ -36,6 +37,22 @@ const API_KEY_LOGIN_DISABLED_MESSAGE: &str =
     "API key login is disabled. Use ChatGPT login instead.";
 const LOGIN_SUCCESS_MESSAGE: &str = "Successfully logged in";
 
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
+
 /// Installs a small file-backed tracing layer for direct `codex login` flows.
 ///
 /// This deliberately duplicates a narrow slice of the TUI logging setup instead of reusing it
@@ -47,15 +64,29 @@ fn init_login_file_logging(config: &Config) -> Option<WorkerGuard> {
     let log_dir = match codex_core::config::log_dir(config) {
         Ok(log_dir) => log_dir,
         Err(err) => {
-            eprintln!("Warning: failed to resolve login log directory: {err}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("警告：解析登录日志目录失败：{err}")
+                } else {
+                    format!("Warning: failed to resolve login log directory: {err}")
+                }
+            );
             return None;
         }
     };
 
     if let Err(err) = std::fs::create_dir_all(&log_dir) {
         eprintln!(
-            "Warning: failed to create login log directory {}: {err}",
-            log_dir.display()
+            "{}",
+            if is_zh_locale() {
+                format!("警告：创建登录日志目录 {} 失败：{err}", log_dir.display())
+            } else {
+                format!(
+                    "Warning: failed to create login log directory {}: {err}",
+                    log_dir.display()
+                )
+            }
         );
         return None;
     }
@@ -74,8 +105,15 @@ fn init_login_file_logging(config: &Config) -> Option<WorkerGuard> {
         Ok(log_file) => log_file,
         Err(err) => {
             eprintln!(
-                "Warning: failed to open login log file {}: {err}",
-                log_path.display()
+                "{}",
+                if is_zh_locale() {
+                    format!("警告：打开登录日志文件 {} 失败：{err}", log_path.display())
+                } else {
+                    format!(
+                        "Warning: failed to open login log file {}: {err}",
+                        log_path.display()
+                    )
+                }
             );
             return None;
         }
@@ -95,8 +133,18 @@ fn init_login_file_logging(config: &Config) -> Option<WorkerGuard> {
     // without reproducing them through TUI or app-server.
     if let Err(err) = tracing_subscriber::registry().with(file_layer).try_init() {
         eprintln!(
-            "Warning: failed to initialize login log file {}: {err}",
-            log_path.display()
+            "{}",
+            if is_zh_locale() {
+                format!(
+                    "警告：初始化登录日志文件 {} 失败：{err}",
+                    log_path.display()
+                )
+            } else {
+                format!(
+                    "Warning: failed to initialize login log file {}: {err}",
+                    log_path.display()
+                )
+            }
         );
         return None;
     }
@@ -106,7 +154,16 @@ fn init_login_file_logging(config: &Config) -> Option<WorkerGuard> {
 
 fn print_login_server_start(actual_port: u16, auth_url: &str) {
     eprintln!(
-        "Starting local login server on http://localhost:{actual_port}.\nIf your browser did not open, navigate to this URL to authenticate:\n\n{auth_url}\n\nOn a remote or headless machine? Use `codex login --device-auth` instead."
+        "{}",
+        if is_zh_locale() {
+            format!(
+                "正在启动本地登录服务：http://localhost:{actual_port}\n如果浏览器未自动打开，请访问以下地址完成认证：\n\n{auth_url}\n\n在远程或无界面机器上？请改用 `codex login --device-auth`。"
+            )
+        } else {
+            format!(
+                "Starting local login server on http://localhost:{actual_port}.\nIf your browser did not open, navigate to this URL to authenticate:\n\n{auth_url}\n\nOn a remote or headless machine? Use `codex login --device-auth` instead."
+            )
+        }
     );
 }
 
@@ -134,7 +191,13 @@ pub async fn run_login_with_chatgpt(cli_config_overrides: CliConfigOverrides) ->
     tracing::info!("starting browser login flow");
 
     if matches!(config.forced_login_method, Some(ForcedLoginMethod::Api)) {
-        eprintln!("{CHATGPT_LOGIN_DISABLED_MESSAGE}");
+        eprintln!(
+            "{}",
+            t(
+                CHATGPT_LOGIN_DISABLED_MESSAGE,
+                "ChatGPT 登录已禁用，请改用 API key 登录。"
+            )
+        );
         std::process::exit(1);
     }
 
@@ -148,11 +211,18 @@ pub async fn run_login_with_chatgpt(cli_config_overrides: CliConfigOverrides) ->
     .await
     {
         Ok(_) => {
-            eprintln!("{LOGIN_SUCCESS_MESSAGE}");
+            eprintln!("{}", t(LOGIN_SUCCESS_MESSAGE, "登录成功"));
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("Error logging in: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("登录失败：{e}")
+                } else {
+                    format!("Error logging in: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }
@@ -167,7 +237,13 @@ pub async fn run_login_with_api_key(
     tracing::info!("starting api key login flow");
 
     if matches!(config.forced_login_method, Some(ForcedLoginMethod::Chatgpt)) {
-        eprintln!("{API_KEY_LOGIN_DISABLED_MESSAGE}");
+        eprintln!(
+            "{}",
+            t(
+                API_KEY_LOGIN_DISABLED_MESSAGE,
+                "API key 登录已禁用，请改用 ChatGPT 登录。"
+            )
+        );
         std::process::exit(1);
     }
 
@@ -177,11 +253,18 @@ pub async fn run_login_with_api_key(
         config.cli_auth_credentials_store_mode,
     ) {
         Ok(_) => {
-            eprintln!("{LOGIN_SUCCESS_MESSAGE}");
+            eprintln!("{}", t(LOGIN_SUCCESS_MESSAGE, "登录成功"));
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("Error logging in: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("登录失败：{e}")
+                } else {
+                    format!("Error logging in: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }
@@ -192,22 +275,42 @@ pub fn read_api_key_from_stdin() -> String {
 
     if stdin.is_terminal() {
         eprintln!(
-            "--with-api-key expects the API key on stdin. Try piping it, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
+            "{}",
+            t(
+                "--with-api-key expects the API key on stdin. Try piping it, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`.",
+                "--with-api-key 需要从 stdin 读取 API key。请用管道传入，例如：`printenv OPENAI_API_KEY | codex login --with-api-key`。"
+            )
         );
         std::process::exit(1);
     }
 
-    eprintln!("Reading API key from stdin...");
+    eprintln!(
+        "{}",
+        t(
+            "Reading API key from stdin...",
+            "正在从 stdin 读取 API key..."
+        )
+    );
 
     let mut buffer = String::new();
     if let Err(err) = stdin.read_to_string(&mut buffer) {
-        eprintln!("Failed to read API key from stdin: {err}");
+        eprintln!(
+            "{}",
+            if is_zh_locale() {
+                format!("从 stdin 读取 API key 失败：{err}")
+            } else {
+                format!("Failed to read API key from stdin: {err}")
+            }
+        );
         std::process::exit(1);
     }
 
     let api_key = buffer.trim().to_string();
     if api_key.is_empty() {
-        eprintln!("No API key provided via stdin.");
+        eprintln!(
+            "{}",
+            t("No API key provided via stdin.", "stdin 中未提供 API key。")
+        );
         std::process::exit(1);
     }
 
@@ -224,7 +327,13 @@ pub async fn run_login_with_device_code(
     let _login_log_guard = init_login_file_logging(&config);
     tracing::info!("starting device code login flow");
     if matches!(config.forced_login_method, Some(ForcedLoginMethod::Api)) {
-        eprintln!("{CHATGPT_LOGIN_DISABLED_MESSAGE}");
+        eprintln!(
+            "{}",
+            t(
+                CHATGPT_LOGIN_DISABLED_MESSAGE,
+                "ChatGPT 登录已禁用，请改用 API key 登录。"
+            )
+        );
         std::process::exit(1);
     }
     let forced_chatgpt_workspace_id = config.forced_chatgpt_workspace_id.clone();
@@ -239,11 +348,18 @@ pub async fn run_login_with_device_code(
     }
     match run_device_code_login(opts).await {
         Ok(()) => {
-            eprintln!("{LOGIN_SUCCESS_MESSAGE}");
+            eprintln!("{}", t(LOGIN_SUCCESS_MESSAGE, "登录成功"));
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("Error logging in with device code: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("设备码登录失败：{e}")
+                } else {
+                    format!("Error logging in with device code: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }
@@ -262,7 +378,13 @@ pub async fn run_login_with_device_code_fallback_to_browser(
     let _login_log_guard = init_login_file_logging(&config);
     tracing::info!("starting login flow with device code fallback");
     if matches!(config.forced_login_method, Some(ForcedLoginMethod::Api)) {
-        eprintln!("{CHATGPT_LOGIN_DISABLED_MESSAGE}");
+        eprintln!(
+            "{}",
+            t(
+                CHATGPT_LOGIN_DISABLED_MESSAGE,
+                "ChatGPT 登录已禁用，请改用 API key 登录。"
+            )
+        );
         std::process::exit(1);
     }
 
@@ -280,33 +402,60 @@ pub async fn run_login_with_device_code_fallback_to_browser(
 
     match run_device_code_login(opts.clone()).await {
         Ok(()) => {
-            eprintln!("{LOGIN_SUCCESS_MESSAGE}");
+            eprintln!("{}", t(LOGIN_SUCCESS_MESSAGE, "登录成功"));
             std::process::exit(0);
         }
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
-                eprintln!("Device code login is not enabled; falling back to browser login.");
+                eprintln!(
+                    "{}",
+                    t(
+                        "Device code login is not enabled; falling back to browser login.",
+                        "设备码登录未启用，改用浏览器登录。"
+                    )
+                );
                 match run_login_server(opts) {
                     Ok(server) => {
                         print_login_server_start(server.actual_port, &server.auth_url);
                         match server.block_until_done().await {
                             Ok(()) => {
-                                eprintln!("{LOGIN_SUCCESS_MESSAGE}");
+                                eprintln!("{}", t(LOGIN_SUCCESS_MESSAGE, "登录成功"));
                                 std::process::exit(0);
                             }
                             Err(e) => {
-                                eprintln!("Error logging in: {e}");
+                                eprintln!(
+                                    "{}",
+                                    if is_zh_locale() {
+                                        format!("登录失败：{e}")
+                                    } else {
+                                        format!("Error logging in: {e}")
+                                    }
+                                );
                                 std::process::exit(1);
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("Error logging in: {e}");
+                        eprintln!(
+                            "{}",
+                            if is_zh_locale() {
+                                format!("登录失败：{e}")
+                            } else {
+                                format!("Error logging in: {e}")
+                            }
+                        );
                         std::process::exit(1);
                     }
                 }
             } else {
-                eprintln!("Error logging in with device code: {e}");
+                eprintln!(
+                    "{}",
+                    if is_zh_locale() {
+                        format!("设备码登录失败：{e}")
+                    } else {
+                        format!("Error logging in with device code: {e}")
+                    }
+                );
                 std::process::exit(1);
             }
         }
@@ -320,25 +469,46 @@ pub async fn run_login_status(cli_config_overrides: CliConfigOverrides) -> ! {
         Ok(Some(auth)) => match auth.auth_mode() {
             AuthMode::ApiKey => match auth.get_token() {
                 Ok(api_key) => {
-                    eprintln!("Logged in using an API key - {}", safe_format_key(&api_key));
+                    eprintln!(
+                        "{}",
+                        if is_zh_locale() {
+                            format!("已使用 API key 登录 - {}", safe_format_key(&api_key))
+                        } else {
+                            format!("Logged in using an API key - {}", safe_format_key(&api_key))
+                        }
+                    );
                     std::process::exit(0);
                 }
                 Err(e) => {
-                    eprintln!("Unexpected error retrieving API key: {e}");
+                    eprintln!(
+                        "{}",
+                        if is_zh_locale() {
+                            format!("读取 API key 时发生意外错误：{e}")
+                        } else {
+                            format!("Unexpected error retrieving API key: {e}")
+                        }
+                    );
                     std::process::exit(1);
                 }
             },
             AuthMode::Chatgpt => {
-                eprintln!("Logged in using ChatGPT");
+                eprintln!("{}", t("Logged in using ChatGPT", "已使用 ChatGPT 登录"));
                 std::process::exit(0);
             }
         },
         Ok(None) => {
-            eprintln!("Not logged in");
+            eprintln!("{}", t("Not logged in", "未登录"));
             std::process::exit(1);
         }
         Err(e) => {
-            eprintln!("Error checking login status: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("检查登录状态失败：{e}")
+                } else {
+                    format!("Error checking login status: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }
@@ -349,15 +519,22 @@ pub async fn run_logout(cli_config_overrides: CliConfigOverrides) -> ! {
 
     match logout(&config.codex_home, config.cli_auth_credentials_store_mode) {
         Ok(true) => {
-            eprintln!("Successfully logged out");
+            eprintln!("{}", t("Successfully logged out", "已退出登录"));
             std::process::exit(0);
         }
         Ok(false) => {
-            eprintln!("Not logged in");
+            eprintln!("{}", t("Not logged in", "未登录"));
             std::process::exit(0);
         }
         Err(e) => {
-            eprintln!("Error logging out: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("退出登录失败：{e}")
+                } else {
+                    format!("Error logging out: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }
@@ -367,7 +544,14 @@ async fn load_config_or_exit(cli_config_overrides: CliConfigOverrides) -> Config
     let cli_overrides = match cli_config_overrides.parse_overrides() {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("Error parsing -c overrides: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("解析 -c 覆盖参数失败：{e}")
+                } else {
+                    format!("Error parsing -c overrides: {e}")
+                }
+            );
             std::process::exit(1);
         }
     };
@@ -375,7 +559,14 @@ async fn load_config_or_exit(cli_config_overrides: CliConfigOverrides) -> Config
     match Config::load_with_cli_overrides(cli_overrides).await {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Error loading configuration: {e}");
+            eprintln!(
+                "{}",
+                if is_zh_locale() {
+                    format!("加载配置失败：{e}")
+                } else {
+                    format!("Error loading configuration: {e}")
+                }
+            );
             std::process::exit(1);
         }
     }

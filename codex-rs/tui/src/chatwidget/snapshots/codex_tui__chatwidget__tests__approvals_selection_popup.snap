@@ -3,13 +3,12 @@ source: tui/src/chatwidget/tests.rs
 assertion_line: 3092
 expression: popup
 ---
-  Update Model Permissions
+  更新模型权限
 
-› 1. Default      Codex can read and edit files in the current workspace, and
-                  run commands. Approval is required to access the internet or
-                  edit other files.
-  2. Full Access  Codex can edit files outside this workspace and access the
-                  internet without asking for approval. Exercise caution when
-                  using.
+› 1. 默认         Codex 可以读取并编辑当前工作区中的文件，并
+                  运行命令。访问互联网或编辑其他文件需要审批。
+                  （与 Agent 模式相同）
+  2. 完全访问     Codex 可在无需审批的情况下编辑工作区外文件并访问
+                  互联网。使用时请谨慎。
 
-  Press enter to confirm or esc to go back
+  按 Enter 确认或按 Esc 返回

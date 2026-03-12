@@ -4,11 +4,11 @@ assertion_line: 828
 expression: "render_lines_with_width(&view, 40)"
 ---
                                         
-  Select Approval Mode                  
+  选择审批模式                  
                                         
-› 1. Read Only (current)  Codex can     
-                          read files    
+› 1. 只读（当前）         Codex 可读取    
+                          文件          
                                         
-  Note: Use /setup-default-sandbox to   
-  allow network access.                 
-  Press enter to confirm or esc to go ba
+  注意：Use /setup-default-sandbox      
+  以允许网络访问。                      
+  按 Enter 确认或按 Esc 返回            

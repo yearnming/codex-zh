@@ -14,6 +14,10 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use toml::Value as TomlValue;
 
+fn t<'a>(zh: &'a str, en: &'a str) -> &'a str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 pub(crate) fn new_debug_config_output(
     config: &Config,
     session_network_proxy: Option<&SessionNetworkProxyRuntime>,
@@ -22,8 +26,8 @@ pub(crate) fn new_debug_config_output(
 
     if let Some(proxy) = session_network_proxy {
         lines.push("".into());
-        lines.push("Session runtime:".bold().into());
-        lines.push("  - network_proxy".into());
+        lines.push(t("会话运行时:", "Session runtime:").bold().into());
+        lines.push(format!("  - {}", t("网络代理", "network_proxy")).into());
         let SessionNetworkProxyRuntime {
             http_addr,
             socks_addr,
@@ -56,25 +60,32 @@ fn render_debug_config_lines(stack: &ConfigLayerStack) -> Vec<Line<'static>> {
     let mut lines = vec!["/debug-config".magenta().into(), "".into()];
 
     lines.push(
-        "Config layer stack (lowest precedence first):"
-            .bold()
-            .into(),
+        t(
+            "配置层栈（优先级从低到高）:",
+            "Config layer stack (lowest precedence first):",
+        )
+        .bold()
+        .into(),
     );
     let layers = stack.get_layers(ConfigLayerStackOrdering::LowestPrecedenceFirst, true);
     if layers.is_empty() {
-        lines.push("  <none>".dim().into());
+        lines.push(format!("  {}", t("<无>", "<none>")).dim().into());
     } else {
         for (index, layer) in layers.iter().enumerate() {
             let source = format_config_layer_source(&layer.name);
             let status = if layer.is_disabled() {
-                "disabled"
+                t("禁用", "disabled")
             } else {
-                "enabled"
+                t("启用", "enabled")
             };
             lines.push(format!("  {}. {source} ({status})", index + 1).into());
             lines.extend(render_non_file_layer_details(layer));
             if let Some(reason) = &layer.disabled_reason {
-                lines.push(format!("     reason: {reason}").dim().into());
+                lines.push(
+                    format!("     {}: {reason}", t("原因", "reason"))
+                        .dim()
+                        .into(),
+                );
             }
         }
     }
@@ -83,7 +94,7 @@ fn render_debug_config_lines(stack: &ConfigLayerStack) -> Vec<Line<'static>> {
     let requirements_toml = stack.requirements_toml();
 
     lines.push("".into());
-    lines.push("Requirements:".bold().into());
+    lines.push(t("要求:", "Requirements:").bold().into());
     let mut requirement_lines = Vec::new();
 
     if let Some(policies) = requirements_toml.allowed_approval_policies.as_ref() {
@@ -141,7 +152,7 @@ fn render_debug_config_lines(stack: &ConfigLayerStack) -> Vec<Line<'static>> {
     if requirements_toml.rules.is_some() {
         requirement_lines.push(requirement_line(
             "rules",
-            "configured".to_string(),
+            t("已配置", "configured").to_string(),
             requirements.exec_policy_source(),
         ));
     }
@@ -163,7 +174,7 @@ fn render_debug_config_lines(stack: &ConfigLayerStack) -> Vec<Line<'static>> {
     }
 
     if requirement_lines.is_empty() {
-        lines.push("  <none>".dim().into());
+        lines.push(format!("  {}", t("<无>", "<none>")).dim().into());
     } else {
         lines.extend(requirement_lines);
     }
@@ -189,7 +200,7 @@ fn render_session_flag_details(config: &TomlValue) -> Vec<Line<'static>> {
     flatten_toml_key_values(config, None, &mut pairs);
 
     if pairs.is_empty() {
-        return vec!["     - <none>".dim().into()];
+        return vec![format!("     - {}", t("<无>", "<none>")).dim().into()];
     }
 
     pairs
@@ -204,15 +215,19 @@ fn render_mdm_layer_details(layer: &ConfigLayerEntry) -> Vec<Line<'static>> {
         .map(ToString::to_string)
         .unwrap_or_else(|| format_toml_value(&layer.config));
     if value.is_empty() {
-        return vec!["     MDM value: <empty>".dim().into()];
+        return vec![
+            format!("     MDM 值: {}", t("<空>", "<empty>"))
+                .dim()
+                .into(),
+        ];
     }
 
     if value.contains('\n') {
-        let mut lines = vec!["     MDM value:".into()];
+        let mut lines = vec!["     MDM 值:".into()];
         lines.extend(value.lines().map(|line| format!("       {line}").into()));
         lines
     } else {
-        vec![format!("     MDM value: {value}").into()]
+        vec![format!("     MDM 值: {value}").into()]
     }
 }
 
@@ -235,7 +250,7 @@ fn flatten_toml_key_values(
             }
         }
         _ => {
-            let key = prefix.unwrap_or("<value>").to_string();
+            let key = prefix.unwrap_or(t("<值>", "<value>")).to_string();
             out.push((key, format_toml_value(value)));
         }
     }
@@ -252,13 +267,13 @@ fn requirement_line(
 ) -> Line<'static> {
     let source = source
         .map(ToString::to_string)
-        .unwrap_or_else(|| "<unspecified>".to_string());
-    format!("  - {name}: {value} (source: {source})").into()
+        .unwrap_or_else(|| t("<未指定>", "<unspecified>").to_string());
+    format!("  - {name}: {value} ({}: {source})", t("来源", "source")).into()
 }
 
 fn join_or_empty(values: Vec<String>) -> String {
     if values.is_empty() {
-        "<empty>".to_string()
+        t("<空>", "<empty>").to_string()
     } else {
         values.join(", ")
     }
@@ -284,23 +299,28 @@ fn format_config_layer_source(source: &ConfigLayerSource) -> String {
             format!("MDM ({domain}:{key})")
         }
         ConfigLayerSource::System { file } => {
-            format!("system ({})", file.as_path().display())
+            format!("{} ({})", t("系统", "system"), file.as_path().display())
         }
         ConfigLayerSource::User { file } => {
-            format!("user ({})", file.as_path().display())
+            format!("{} ({})", t("用户", "user"), file.as_path().display())
         }
         ConfigLayerSource::Project { dot_codex_folder } => {
             format!(
-                "project ({}/config.toml)",
+                "{} ({}/config.toml)",
+                t("项目", "project"),
                 dot_codex_folder.as_path().display()
             )
         }
-        ConfigLayerSource::SessionFlags => "session-flags".to_string(),
+        ConfigLayerSource::SessionFlags => t("会话标志", "session-flags").to_string(),
         ConfigLayerSource::LegacyManagedConfigTomlFromFile { file } => {
-            format!("legacy managed_config.toml ({})", file.as_path().display())
+            format!(
+                "{} managed_config.toml ({})",
+                t("旧版", "legacy"),
+                file.as_path().display()
+            )
         }
         ConfigLayerSource::LegacyManagedConfigTomlFromMdm => {
-            "legacy managed_config.toml (MDM)".to_string()
+            format!("{} managed_config.toml (MDM)", t("旧版", "legacy"))
         }
     }
 }
@@ -465,11 +485,14 @@ mod tests {
         .expect("config layer stack");
 
         let rendered = render_to_text(&render_debug_config_lines(&stack));
-        assert!(rendered.contains("(enabled)"));
-        assert!(rendered.contains("(disabled)"));
-        assert!(rendered.contains("reason: project is untrusted"));
-        assert!(rendered.contains("Requirements:"));
-        assert!(rendered.contains("  <none>"));
+        assert!(rendered.contains(format!("({})", super::t("启用", "enabled")).as_str()));
+        assert!(rendered.contains(format!("({})", super::t("禁用", "disabled")).as_str()));
+        assert!(
+            rendered
+                .contains(format!("{}: project is untrusted", super::t("原因", "reason")).as_str())
+        );
+        assert!(rendered.contains(super::t("要求:", "Requirements:")));
+        assert!(rendered.contains(format!("  {}", super::t("<无>", "<none>")).as_str()));
     }
 
     #[test]
@@ -556,12 +579,19 @@ mod tests {
 
         let rendered = render_to_text(&render_debug_config_lines(&stack));
         assert!(
-            rendered.contains("allowed_approval_policies: on-request (source: cloud requirements)")
+            rendered.contains(
+                format!(
+                    "allowed_approval_policies: on-request ({}: cloud requirements)",
+                    super::t("来源", "source")
+                )
+                .as_str()
+            )
         );
         assert!(
             rendered.contains(
                 format!(
-                    "allowed_sandbox_modes: read-only (source: {})",
+                    "allowed_sandbox_modes: read-only ({}: {})",
+                    super::t("来源", "source"),
                     requirements_file.as_path().display()
                 )
                 .as_str(),
@@ -569,13 +599,37 @@ mod tests {
         );
         assert!(
             rendered.contains(
-                "allowed_web_search_modes: cached, disabled (source: cloud requirements)"
+                format!(
+                    "allowed_web_search_modes: cached, disabled ({}: cloud requirements)",
+                    super::t("来源", "source")
+                )
+                .as_str()
             )
         );
-        assert!(rendered.contains("mcp_servers: docs (source: MDM managed_config.toml (legacy))"));
-        assert!(rendered.contains("enforce_residency: us (source: cloud requirements)"));
+        assert!(
+            rendered.contains(
+                format!(
+                    "mcp_servers: docs ({}: MDM managed_config.toml (legacy))",
+                    super::t("来源", "source")
+                )
+                .as_str()
+            )
+        );
+        assert!(
+            rendered.contains(
+                format!(
+                    "enforce_residency: us ({}: cloud requirements)",
+                    super::t("来源", "source")
+                )
+                .as_str()
+            )
+        );
         assert!(rendered.contains(
-            "experimental_network: enabled=true, allowed_domains=[example.com] (source: cloud requirements)"
+            format!(
+                "experimental_network: enabled=true, allowed_domains=[example.com] ({}: cloud requirements)",
+                super::t("来源", "source")
+            )
+            .as_str()
         ));
         assert!(!rendered.contains("  - rules:"));
     }
@@ -602,7 +656,16 @@ writable_roots = ["/tmp"]
         .expect("config layer stack");
 
         let rendered = render_to_text(&render_debug_config_lines(&stack));
-        assert!(rendered.contains("session-flags (enabled)"));
+        assert!(
+            rendered.contains(
+                format!(
+                    "{} ({})",
+                    super::t("会话标志", "session-flags"),
+                    super::t("启用", "enabled")
+                )
+                .as_str()
+            )
+        );
         assert!(rendered.contains("     - model = \"gpt-5\""));
         assert!(rendered.contains("     - sandbox_workspace_write.network_access = true"));
         assert!(rendered.contains("sandbox_workspace_write.writable_roots"));
@@ -630,8 +693,17 @@ approval_policy = "never"
         .expect("config layer stack");
 
         let rendered = render_to_text(&render_debug_config_lines(&stack));
-        assert!(rendered.contains("legacy managed_config.toml (MDM) (enabled)"));
-        assert!(rendered.contains("MDM value:"));
+        assert!(
+            rendered.contains(
+                format!(
+                    "{} managed_config.toml (MDM) ({})",
+                    super::t("旧版", "legacy"),
+                    super::t("启用", "enabled")
+                )
+                .as_str()
+            )
+        );
+        assert!(rendered.contains("MDM 值:"));
         assert!(rendered.contains("# managed by MDM"));
         assert!(rendered.contains("model = \"managed_model\""));
         assert!(rendered.contains("approval_policy = \"never\""));
@@ -663,7 +735,13 @@ approval_policy = "never"
 
         let rendered = render_to_text(&render_debug_config_lines(&stack));
         assert!(
-            rendered.contains("allowed_web_search_modes: disabled (source: cloud requirements)")
+            rendered.contains(
+                format!(
+                    "allowed_web_search_modes: disabled ({}: cloud requirements)",
+                    super::t("来源", "source")
+                )
+                .as_str()
+            )
         );
     }
 

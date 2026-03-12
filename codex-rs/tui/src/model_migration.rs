@@ -38,6 +38,10 @@ pub(crate) struct ModelMigrationCopy {
     pub markdown: Option<String>,
 }
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MigrationMenuOption {
     TryNewModel,
@@ -51,8 +55,8 @@ impl MigrationMenuOption {
 
     fn label(self) -> &'static str {
         match self {
-            Self::TryNewModel => "Try new model",
-            Self::UseExistingModel => "Use existing model",
+            Self::TryNewModel => t("Try new model", "试用新模型"),
+            Self::UseExistingModel => t("Use existing model", "继续使用当前模型"),
         }
     }
 }
@@ -68,6 +72,7 @@ pub(crate) fn migration_copy_for_models(
     target_description: Option<String>,
     can_opt_out: bool,
 ) -> ModelMigrationCopy {
+    let is_zh = crate::is_zh_locale();
     if let Some(migration_markdown) = migration_markdown {
         return ModelMigrationCopy {
             heading: Vec::new(),
@@ -81,9 +86,11 @@ pub(crate) fn migration_copy_for_models(
         };
     }
 
-    let heading_text = Span::from(format!(
-        "Codex just got an upgrade. Introducing {target_display_name}."
-    ))
+    let heading_text = Span::from(if is_zh {
+        format!("Codex 刚刚升级。隆重介绍 {target_display_name}。")
+    } else {
+        format!("Codex just got an upgrade. Introducing {target_display_name}.")
+    })
     .bold();
     let description_line: Line<'static>;
     if let Some(migration_copy) = &migration_copy {
@@ -93,23 +100,33 @@ pub(crate) fn migration_copy_for_models(
             .filter(|desc| !desc.is_empty())
             .map(Line::from)
             .unwrap_or_else(|| {
-                Line::from(format!(
-                    "{target_display_name} is recommended for better performance and reliability."
-                ))
+                Line::from(if is_zh {
+                    format!("{target_display_name} 可提供更好的性能与稳定性。")
+                } else {
+                    format!(
+                        "{target_display_name} is recommended for better performance and reliability."
+                    )
+                })
             });
     }
 
     let mut content = vec![];
     if migration_copy.is_none() {
-        content.push(Line::from(format!(
-            "We recommend switching from {current_model} to {target_model}."
-        )));
+        content.push(Line::from(if is_zh {
+            format!("建议从 {current_model} 切换到 {target_model}。")
+        } else {
+            format!("We recommend switching from {current_model} to {target_model}.")
+        }));
         content.push(Line::from(""));
     }
 
     if let Some(model_link) = model_link {
         content.push(Line::from(vec![
-            format!("{description_line} Learn more about {target_display_name} at ").into(),
+            if is_zh {
+                format!("{description_line} 了解更多 {target_display_name}：").into()
+            } else {
+                format!("{description_line} Learn more about {target_display_name} at ").into()
+            },
             model_link.cyan().underlined(),
         ]));
         content.push(Line::from(""));
@@ -119,11 +136,20 @@ pub(crate) fn migration_copy_for_models(
     }
 
     if can_opt_out {
-        content.push(Line::from(format!(
-            "You can continue using {current_model} if you prefer."
-        )));
+        content.push(Line::from(if is_zh {
+            format!("如需继续使用 {current_model}，也可以。")
+        } else {
+            format!("You can continue using {current_model} if you prefer.")
+        }));
     } else {
-        content.push(Line::from("Press enter to continue".dim()));
+        content.push(Line::from(
+            if is_zh {
+                "按 Enter 继续"
+            } else {
+                "Press enter to continue"
+            }
+            .dim(),
+        ));
     }
 
     ModelMigrationCopy {
@@ -332,11 +358,16 @@ impl ModelMigrationScreen {
     }
 
     fn render_menu(&self, column: &mut ColumnRenderable) {
+        let is_zh = crate::is_zh_locale();
         column.push(Line::from(""));
         column.push(
-            Paragraph::new("Choose how you'd like Codex to proceed.")
-                .wrap(Wrap { trim: false })
-                .inset(Insets::tlbr(0, 2, 0, 0)),
+            Paragraph::new(if is_zh {
+                "选择 Codex 接下来的操作方式。"
+            } else {
+                "Choose how you'd like Codex to proceed."
+            })
+            .wrap(Wrap { trim: false })
+            .inset(Insets::tlbr(0, 2, 0, 0)),
         );
         column.push(Line::from(""));
 
@@ -351,13 +382,21 @@ impl ModelMigrationScreen {
         column.push(Line::from(""));
         column.push(
             Line::from(vec![
-                "Use ".dim(),
+                if is_zh { "使用 ".dim() } else { "Use ".dim() },
                 key_hint::plain(KeyCode::Up).into(),
                 "/".dim(),
                 key_hint::plain(KeyCode::Down).into(),
-                " to move, press ".dim(),
+                if is_zh {
+                    " 移动，按 ".dim()
+                } else {
+                    " to move, press ".dim()
+                },
                 key_hint::plain(KeyCode::Enter).into(),
-                " to confirm".dim(),
+                if is_zh {
+                    " 确认".dim()
+                } else {
+                    " to confirm".dim()
+                },
             ])
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );
@@ -390,6 +429,22 @@ fn is_ctrl_exit_combo(key_event: KeyEvent) -> bool {
 }
 
 fn fill_migration_markdown(template: &str, current_model: &str, target_model: &str) -> String {
+    let template = if crate::is_zh_locale() {
+        let trimmed = template.trim();
+        if trimmed.starts_with("**Codex just got an upgrade. Introducing {model_to}.**")
+            && trimmed.contains(
+                "Codex is now powered by {model_to}, our most capable agentic coding model yet.",
+            )
+            && trimmed.contains("Learn more: https://openai.com/index/introducing-gpt-5-3-codex/")
+            && trimmed.contains("You can keep using {model_from} if you prefer.")
+        {
+            "**Codex 刚刚升级。隆重介绍 {model_to}.**\n\nCodex 现已由 {model_to} 驱动，这是目前最强大的 agentic 编码模型。它面向长期、项目级的工作，支持中途指引与频繁进度更新，方便你在运行时协作（而且速度更快）。\n\n了解更多：https://openai.com/index/introducing-gpt-5-3-codex/\n\n如需继续使用 {model_from}，也可以。\n"
+        } else {
+            template
+        }
+    } else {
+        template
+    };
     template
         .replace("{model_from}", current_model)
         .replace("{model_to}", target_model)
@@ -422,13 +477,10 @@ mod tests {
                 "gpt-5.1-codex-mini",
                 "gpt-5.1-codex-max",
                 None,
-                Some(
-                    "Upgrade to gpt-5.2-codex for the latest and greatest agentic coding model."
-                        .to_string(),
-                ),
+                Some("升级到 gpt-5.2-codex，体验最新最强的 agentic 编码模型。".to_string()),
                 None,
                 "gpt-5.1-codex-max".to_string(),
-                Some("Codex-optimized flagship for deep and fast reasoning.".to_string()),
+                Some("为深度和快速推理优化的 Codex 旗舰模型。".to_string()),
                 true,
             ),
         );
@@ -457,7 +509,7 @@ mod tests {
                 None,
                 None,
                 "gpt-5.1".to_string(),
-                Some("Broad world knowledge with strong general reasoning.".to_string()),
+                Some("广泛的世界知识与强大的通用推理能力。".to_string()),
                 false,
             ),
         );
@@ -484,7 +536,7 @@ mod tests {
                 None,
                 None,
                 "gpt-5.1-codex-max".to_string(),
-                Some("Codex-optimized flagship for deep and fast reasoning.".to_string()),
+                Some("为深度和快速推理优化的 Codex 旗舰模型。".to_string()),
                 false,
             ),
         );
@@ -511,7 +563,7 @@ mod tests {
                 None,
                 None,
                 "gpt-5.1-codex-mini".to_string(),
-                Some("Optimized for codex. Cheaper, faster, but less capable.".to_string()),
+                Some("为 Codex 优化。更便宜、更快，但能力更弱。".to_string()),
                 false,
             ),
         );

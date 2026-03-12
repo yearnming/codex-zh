@@ -2,13 +2,13 @@
 source: tui/src/chatwidget/tests.rs
 expression: terminal.backend().vt100().screen().contents()
 ---
-  ✨ New version available! Would you like to update?
+  ✨ 新版本可用！是否更新？
 
-  Full release notes: https://github.com/openai/codex/releases/latest
+  完整更新说明: https://github.com/openai/codex/releases/latest
 
 
-› 1. Yes, update now
-  2. No, not now
-  3. Don't remind me
+› 1. 是，立即更新
+  2. 暂不更新
+  3. 不再提示
 
-  Press enter to confirm or esc to go back
+  按 enter 确认或按 esc 返回

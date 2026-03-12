@@ -12,10 +12,22 @@ pub(crate) const MAX_POPUP_ROWS: usize = 8;
 /// Standard footer hint text used by popups.
 pub(crate) fn standard_popup_hint_line() -> Line<'static> {
     Line::from(vec![
-        "Press ".into(),
+        if crate::is_zh_locale() {
+            "按 ".into()
+        } else {
+            "Press ".into()
+        },
         key_hint::plain(KeyCode::Enter).into(),
-        " to confirm or ".into(),
+        if crate::is_zh_locale() {
+            " 确认或按 ".into()
+        } else {
+            " to confirm or ".into()
+        },
         key_hint::plain(KeyCode::Esc).into(),
-        " to go back".into(),
+        if crate::is_zh_locale() {
+            " 返回".into()
+        } else {
+            " to go back".into()
+        },
     ])
 }

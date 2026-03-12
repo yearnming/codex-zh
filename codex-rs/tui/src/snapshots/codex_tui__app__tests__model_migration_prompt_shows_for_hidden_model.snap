@@ -2,10 +2,10 @@
 source: tui/src/app.rs
 expression: model_migration_copy_to_plain_text(&copy)
 ---
-**Codex just got an upgrade. Introducing gpt-5.3-codex.**
+**Codex 刚刚升级。隆重介绍 gpt-5.3-codex.**
 
-Codex is now powered by gpt-5.3-codex, our most capable agentic coding model yet. It's built for long-running, project-scale work, with mid-turn steering + frequent progress updates so you can collaborate while it runs (and it's faster too).
+Codex 现已由 gpt-5.3-codex 驱动，这是目前最强大的 agentic 编码模型。它面向长期、项目级的工作，支持中途指引与频繁进度更新，方便你在运行时协作（而且速度更快）。
 
-Learn more: https://openai.com/index/introducing-gpt-5-3-codex/
+了解更多：https://openai.com/index/introducing-gpt-5-3-codex/
 
-You can keep using gpt-5.1-codex if you prefer.
+如需继续使用 gpt-5.1-codex，也可以。

@@ -2,6 +2,6 @@
 source: tui/src/status_indicator_widget.rs
 expression: terminal.backend()
 ---
-"• Working (0s)                "
+"• 工作中 (0秒)               "
 "  └ A man a plan a canal      "
 "    panama                    "

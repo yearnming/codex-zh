@@ -103,12 +103,18 @@ const KEY_ENTER: KeyBinding = key_hint::plain(KeyCode::Enter);
 const KEY_CTRL_T: KeyBinding = key_hint::ctrl(KeyCode::Char('t'));
 const KEY_CTRL_C: KeyBinding = key_hint::ctrl(KeyCode::Char('c'));
 
-// Common pager navigation hints rendered on the first line
-const PAGER_KEY_HINTS: &[(&[KeyBinding], &str)] = &[
-    (&[KEY_UP, KEY_DOWN], "to scroll"),
-    (&[KEY_PAGE_UP, KEY_PAGE_DOWN], "to page"),
-    (&[KEY_HOME, KEY_END], "to jump"),
-];
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
+// Common pager navigation hints rendered on the first line.
+fn pager_key_hints() -> Vec<(&'static [KeyBinding], &'static str)> {
+    vec![
+        (&[KEY_UP, KEY_DOWN], t("to scroll", "滚动")),
+        (&[KEY_PAGE_UP, KEY_PAGE_DOWN], t("to page", "翻页")),
+        (&[KEY_HOME, KEY_END], t("to jump", "跳转")),
+    ]
+}
 
 // Render a single line of key hints from (key(s), description) pairs.
 fn render_key_hints(area: Rect, buf: &mut Buffer, pairs: &[(&[KeyBinding], &str)]) {
@@ -657,15 +663,16 @@ impl TranscriptOverlay {
     fn render_hints(&self, area: Rect, buf: &mut Buffer) {
         let line1 = Rect::new(area.x, area.y, area.width, 1);
         let line2 = Rect::new(area.x, area.y.saturating_add(1), area.width, 1);
-        render_key_hints(line1, buf, PAGER_KEY_HINTS);
+        let key_hints = pager_key_hints();
+        render_key_hints(line1, buf, &key_hints);
 
-        let mut pairs: Vec<(&[KeyBinding], &str)> = vec![(&[KEY_Q], "to quit")];
+        let mut pairs: Vec<(&[KeyBinding], &str)> = vec![(&[KEY_Q], t("to quit", "退出"))];
         if self.highlight_cell.is_some() {
-            pairs.push((&[KEY_ESC, KEY_LEFT], "to edit prev"));
-            pairs.push((&[KEY_RIGHT], "to edit next"));
-            pairs.push((&[KEY_ENTER], "to edit message"));
+            pairs.push((&[KEY_ESC, KEY_LEFT], t("to edit prev", "编辑上一条")));
+            pairs.push((&[KEY_RIGHT], t("to edit next", "编辑下一条")));
+            pairs.push((&[KEY_ENTER], t("to edit message", "编辑消息")));
         } else {
-            pairs.push((&[KEY_ESC], "to edit prev"));
+            pairs.push((&[KEY_ESC], t("to edit prev", "编辑上一条")));
         }
         render_key_hints(line2, buf, &pairs);
     }
@@ -729,8 +736,9 @@ impl StaticOverlay {
     fn render_hints(&self, area: Rect, buf: &mut Buffer) {
         let line1 = Rect::new(area.x, area.y, area.width, 1);
         let line2 = Rect::new(area.x, area.y.saturating_add(1), area.width, 1);
-        render_key_hints(line1, buf, PAGER_KEY_HINTS);
-        let pairs: Vec<(&[KeyBinding], &str)> = vec![(&[KEY_Q], "to quit")];
+        let key_hints = pager_key_hints();
+        render_key_hints(line1, buf, &key_hints);
+        let pairs: Vec<(&[KeyBinding], &str)> = vec![(&[KEY_Q], t("to quit", "退出"))];
         render_key_hints(line2, buf, &pairs);
     }
 

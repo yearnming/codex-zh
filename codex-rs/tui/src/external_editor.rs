@@ -10,13 +10,13 @@ use tokio::process::Command;
 
 #[derive(Debug, Error)]
 pub(crate) enum EditorError {
-    #[error("neither VISUAL nor EDITOR is set")]
-    MissingEditor,
+    #[error("{0}")]
+    MissingEditor(String),
     #[cfg(not(windows))]
-    #[error("failed to parse editor command")]
-    ParseFailed,
-    #[error("editor command is empty")]
-    EmptyCommand,
+    #[error("{0}")]
+    ParseFailed(String),
+    #[error("{0}")]
+    EmptyCommand(String),
 }
 
 /// Tries to resolve the full path to a Windows program, respecting PATH + PATHEXT.
@@ -33,7 +33,7 @@ fn resolve_windows_program(program: &str) -> std::path::PathBuf {
 pub(crate) fn resolve_editor_command() -> std::result::Result<Vec<String>, EditorError> {
     let raw = env::var("VISUAL")
         .or_else(|_| env::var("EDITOR"))
-        .map_err(|_| EditorError::MissingEditor)?;
+        .map_err(|_| err_missing_editor())?;
     let parts = {
         #[cfg(windows)]
         {
@@ -41,11 +41,11 @@ pub(crate) fn resolve_editor_command() -> std::result::Result<Vec<String>, Edito
         }
         #[cfg(not(windows))]
         {
-            shlex::split(&raw).ok_or(EditorError::ParseFailed)?
+            shlex::split(&raw).ok_or_else(err_parse_failed)?
         }
     };
     if parts.is_empty() {
-        return Err(EditorError::EmptyCommand);
+        return Err(err_empty_command());
     }
     Ok(parts)
 }
@@ -53,7 +53,7 @@ pub(crate) fn resolve_editor_command() -> std::result::Result<Vec<String>, Edito
 /// Write `seed` to a temp file, launch the editor command, and return the updated content.
 pub(crate) async fn run_editor(seed: &str, editor_cmd: &[String]) -> Result<String> {
     if editor_cmd.is_empty() {
-        return Err(Report::msg("editor command is empty"));
+        return Err(Report::msg(err_empty_command_message()));
     }
 
     // Convert to TempPath immediately so no file handle stays open on Windows.
@@ -83,11 +83,46 @@ pub(crate) async fn run_editor(seed: &str, editor_cmd: &[String]) -> Result<Stri
         .await?;
 
     if !status.success() {
-        return Err(Report::msg(format!("editor exited with status {status}")));
+        return Err(Report::msg(err_editor_status_message(&status)));
     }
 
     let contents = fs::read_to_string(&temp_path)?;
     Ok(contents)
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
+fn err_missing_editor() -> EditorError {
+    EditorError::MissingEditor(
+        t(
+            "neither VISUAL nor EDITOR is set",
+            "未设置 VISUAL 或 EDITOR",
+        )
+        .to_string(),
+    )
+}
+
+#[cfg(not(windows))]
+fn err_parse_failed() -> EditorError {
+    EditorError::ParseFailed(t("failed to parse editor command", "解析编辑器命令失败").to_string())
+}
+
+fn err_empty_command() -> EditorError {
+    EditorError::EmptyCommand(err_empty_command_message())
+}
+
+fn err_empty_command_message() -> String {
+    t("editor command is empty", "编辑器命令为空").to_string()
+}
+
+fn err_editor_status_message(status: &std::process::ExitStatus) -> String {
+    if crate::is_zh_locale() {
+        format!("编辑器退出，状态码 {status}")
+    } else {
+        format!("editor exited with status {status}")
+    }
 }
 
 #[cfg(test)]
@@ -148,7 +183,7 @@ mod tests {
         }
         assert!(matches!(
             resolve_editor_command(),
-            Err(EditorError::MissingEditor)
+            Err(EditorError::MissingEditor(_))
         ));
     }
 

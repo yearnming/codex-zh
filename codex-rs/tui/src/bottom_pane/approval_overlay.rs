@@ -47,17 +47,16 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
 }
 
 fn approval_title_exec(network_host: Option<&str>) -> String {
@@ -67,27 +66,29 @@ fn approval_title_exec(network_host: Option<&str>) -> String {
         } else {
             format!("Do you want to approve network access to \"{host}\"?")
         }
-    } else if is_zh_locale() {
-        "是否执行以下命令？".to_string()
     } else {
-        "Would you like to run the following command?".to_string()
+        t(
+            "Would you like to run the following command?",
+            "是否执行以下命令？",
+        )
+        .to_string()
     }
 }
 
 fn approval_title_permissions() -> String {
-    if is_zh_locale() {
-        "是否授予以下权限？".to_string()
-    } else {
-        "Would you like to grant these permissions?".to_string()
-    }
+    t(
+        "Would you like to grant these permissions?",
+        "是否授予以下权限？",
+    )
+    .to_string()
 }
 
 fn approval_title_patch() -> String {
-    if is_zh_locale() {
-        "是否应用以下修改？".to_string()
-    } else {
-        "Would you like to make the following edits?".to_string()
-    }
+    t(
+        "Would you like to make the following edits?",
+        "是否应用以下修改？",
+    )
+    .to_string()
 }
 
 fn approval_title_mcp(server_name: &str) -> String {
@@ -99,64 +100,34 @@ fn approval_title_mcp(server_name: &str) -> String {
 }
 
 fn label_thread() -> &'static str {
-    if is_zh_locale() {
-        "会话："
-    } else {
-        "Thread: "
-    }
+    t("Thread: ", "会话：")
 }
 
 fn label_reason() -> &'static str {
-    if is_zh_locale() {
-        "原因："
-    } else {
-        "Reason: "
-    }
+    t("Reason: ", "原因：")
 }
 
 fn label_permission_rule() -> &'static str {
-    if is_zh_locale() {
-        "权限规则："
-    } else {
-        "Permission rule: "
-    }
+    t("Permission rule: ", "权限规则：")
 }
 
 fn label_server() -> &'static str {
-    if is_zh_locale() {
-        "服务器："
-    } else {
-        "Server: "
-    }
+    t("Server: ", "服务器：")
 }
 
 fn approval_footer_hint_text(has_thread: bool) -> Line<'static> {
     let mut spans = vec![
-        if is_zh_locale() { "按 " } else { "Press " }.into(),
+        t("Press ", "按 ").into(),
         key_hint::plain(KeyCode::Enter).into(),
-        if is_zh_locale() {
-            " 确认或按 "
-        } else {
-            " to confirm or "
-        }
-        .into(),
+        t(" to confirm or ", " 确认或按 ").into(),
         key_hint::plain(KeyCode::Esc).into(),
-        if is_zh_locale() {
-            " 取消"
-        } else {
-            " to cancel"
-        }
-        .into(),
+        t(" to cancel", " 取消").into(),
     ];
     if has_thread {
         spans.extend([
-            if is_zh_locale() { "，或按 " } else { " or " }.into(),
+            t(" or ", "，或按 ").into(),
             key_hint::plain(KeyCode::Char('o')).into(),
-            if is_zh_locale() {
-                " 打开会话".into()
-            } else {
-                " to open thread".into()
-            },
+            t(" to open thread", " 打开会话").into(),
         ]);
     }
     Line::from(spans)
@@ -402,11 +373,17 @@ impl ApprovalOverlay {
         };
         if request.thread_label().is_none() {
             let message = if granted_permissions.is_empty() {
-                "You did not grant additional permissions"
+                t(
+                    "You did not grant additional permissions",
+                    "你未授予额外权限",
+                )
             } else if matches!(scope, PermissionGrantScope::Session) {
-                "You granted additional permissions for this session"
+                t(
+                    "You granted additional permissions for this session",
+                    "你为本会话授予了额外权限",
+                )
             } else {
-                "You granted additional permissions"
+                t("You granted additional permissions", "你已授予额外权限")
             };
             self.app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
                 crate::history_cell::PlainHistoryCell::new(vec![message.into()]),
@@ -894,7 +871,7 @@ pub(crate) fn format_additional_permissions_rule(
         .and_then(|network| network.enabled)
         .unwrap_or(false)
     {
-        parts.push("network".to_string());
+        parts.push(t("network", "网络").to_string());
     }
     if let Some(file_system) = additional_permissions.file_system.as_ref() {
         if let Some(read) = file_system.read.as_ref() {
@@ -903,7 +880,7 @@ pub(crate) fn format_additional_permissions_rule(
                 .map(|path| format!("`{}`", path.display()))
                 .collect::<Vec<_>>()
                 .join(", ");
-            parts.push(format!("read {reads}"));
+            parts.push(format!("{} {reads}", t("read", "读取")));
         }
         if let Some(write) = file_system.write.as_ref() {
             let writes = write
@@ -911,7 +888,7 @@ pub(crate) fn format_additional_permissions_rule(
                 .map(|path| format!("`{}`", path.display()))
                 .collect::<Vec<_>>()
                 .join(", ");
-            parts.push(format!("write {writes}"));
+            parts.push(format!("{} {writes}", t("write", "写入")));
         }
     }
     if let Some(macos) = additional_permissions.macos.as_ref() {
@@ -920,28 +897,35 @@ pub(crate) fn format_additional_permissions_rule(
             MacOsPreferencesPermission::ReadOnly
         ) {
             let value = match macos.macos_preferences {
-                MacOsPreferencesPermission::ReadOnly => "readonly",
-                MacOsPreferencesPermission::ReadWrite => "readwrite",
-                MacOsPreferencesPermission::None => "none",
+                MacOsPreferencesPermission::ReadOnly => t("readonly", "只读"),
+                MacOsPreferencesPermission::ReadWrite => t("readwrite", "读写"),
+                MacOsPreferencesPermission::None => t("none", "无"),
             };
-            parts.push(format!("macOS preferences {value}"));
+            parts.push(format!(
+                "{} {value}",
+                t("macOS preferences", "macOS 偏好设置")
+            ));
         }
         match &macos.macos_automation {
             MacOsAutomationPermission::All => {
-                parts.push("macOS automation all".to_string());
+                parts.push(t("macOS automation all", "macOS 自动化（全部）").to_string());
             }
             MacOsAutomationPermission::BundleIds(bundle_ids) => {
                 if !bundle_ids.is_empty() {
-                    parts.push(format!("macOS automation {}", bundle_ids.join(", ")));
+                    parts.push(format!(
+                        "{} {}",
+                        t("macOS automation", "macOS 自动化"),
+                        bundle_ids.join(", ")
+                    ));
                 }
             }
             MacOsAutomationPermission::None => {}
         }
         if macos.macos_accessibility {
-            parts.push("macOS accessibility".to_string());
+            parts.push(t("macOS accessibility", "macOS 辅助功能").to_string());
         }
         if macos.macos_calendar {
-            parts.push("macOS calendar".to_string());
+            parts.push(t("macOS calendar", "macOS 日历").to_string());
         }
     }
 
@@ -1536,7 +1520,9 @@ mod tests {
             "expected permission-rule line, got {rendered:?}"
         );
         assert!(
-            rendered.iter().any(|line| line.contains("network;")),
+            rendered
+                .iter()
+                .any(|line| line.contains("network;") || line.contains("网络;")),
             "expected network permission text, got {rendered:?}"
         );
     }
@@ -1689,6 +1675,11 @@ mod tests {
 
     #[test]
     fn exec_history_cell_wraps_with_two_space_indent() {
+        let key = "CODEX_LOCALE";
+        let prev = std::env::var(key).ok();
+        unsafe {
+            std::env::set_var(key, "en-US");
+        }
         let command = vec![
             "/bin/zsh".into(),
             "-lc".into(),
@@ -1712,6 +1703,14 @@ mod tests {
             "  renderable.rs this time".to_string(),
         ];
         assert_eq!(rendered, expected);
+        match prev {
+            Some(value) => unsafe {
+                std::env::set_var(key, value);
+            },
+            None => unsafe {
+                std::env::remove_var(key);
+            },
+        }
     }
 
     #[test]

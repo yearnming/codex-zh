@@ -31,7 +31,13 @@ use super::scroll_state::ScrollState;
 use super::selection_popup_common::GenericDisplayRow;
 use super::selection_popup_common::render_rows_single_line;
 
-const SEARCH_PLACEHOLDER: &str = "Type to search skills";
+fn search_placeholder() -> &'static str {
+    if crate::is_zh_locale() {
+        "输入以搜索技能"
+    } else {
+        "Type to search skills"
+    }
+}
 const SEARCH_PROMPT_PREFIX: &str = "> ";
 
 pub(crate) struct SkillsToggleItem {
@@ -56,9 +62,22 @@ pub(crate) struct SkillsToggleView {
 impl SkillsToggleView {
     pub(crate) fn new(items: Vec<SkillsToggleItem>, app_event_tx: AppEventSender) -> Self {
         let mut header = ColumnRenderable::new();
-        header.push(Line::from("Enable/Disable Skills".bold()));
+        let is_zh = crate::is_zh_locale();
         header.push(Line::from(
-            "Turn skills on or off. Your changes are saved automatically.".dim(),
+            if is_zh {
+                "启用/停用技能"
+            } else {
+                "Enable/Disable Skills"
+            }
+            .bold(),
+        ));
+        header.push(Line::from(
+            if is_zh {
+                "开启或关闭技能。更改会自动保存。"
+            } else {
+                "Turn skills on or off. Your changes are saved automatically."
+            }
+            .dim(),
         ));
 
         let mut view = Self {
@@ -322,7 +341,7 @@ impl Renderable for SkillsToggleView {
         if search_area.height >= 2 {
             let [placeholder_area, input_area] =
                 Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(search_area);
-            Line::from(SEARCH_PLACEHOLDER.dim()).render(placeholder_area, buf);
+            Line::from(search_placeholder().dim()).render(placeholder_area, buf);
             let line = if self.search_query.is_empty() {
                 Line::from(vec![SEARCH_PROMPT_PREFIX.dim()])
             } else {
@@ -334,7 +353,7 @@ impl Renderable for SkillsToggleView {
             line.render(input_area, buf);
         } else if search_area.height > 0 {
             let query_span = if self.search_query.is_empty() {
-                SEARCH_PLACEHOLDER.dim()
+                search_placeholder().dim()
             } else {
                 self.search_query.clone().into()
             };
@@ -354,7 +373,11 @@ impl Renderable for SkillsToggleView {
                 &rows,
                 &self.state,
                 render_area.height as usize,
-                "no matches",
+                if crate::is_zh_locale() {
+                    "没有匹配结果"
+                } else {
+                    "no matches"
+                },
             );
         }
 
@@ -370,13 +393,29 @@ impl Renderable for SkillsToggleView {
 
 fn skills_toggle_hint_line() -> Line<'static> {
     Line::from(vec![
-        "Press ".into(),
+        if crate::is_zh_locale() {
+            "按 ".into()
+        } else {
+            "Press ".into()
+        },
         key_hint::plain(KeyCode::Char(' ')).into(),
-        " or ".into(),
+        if crate::is_zh_locale() {
+            " 或 ".into()
+        } else {
+            " or ".into()
+        },
         key_hint::plain(KeyCode::Enter).into(),
-        " to toggle; ".into(),
+        if crate::is_zh_locale() {
+            " 切换；按 ".into()
+        } else {
+            " to toggle; ".into()
+        },
         key_hint::plain(KeyCode::Esc).into(),
-        " to close".into(),
+        if crate::is_zh_locale() {
+            " 关闭".into()
+        } else {
+            " to close".into()
+        },
     ])
 }
 

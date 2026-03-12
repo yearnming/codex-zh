@@ -63,6 +63,30 @@ const FIXED_LEFT_COLUMN_DENOMINATOR: usize = 10;
 const MENU_SURFACE_INSET_V: u16 = 1;
 const MENU_SURFACE_INSET_H: u16 = 2;
 
+fn disabled_suffix() -> &'static str {
+    if crate::is_zh_locale() {
+        "（已禁用）"
+    } else {
+        " (disabled)"
+    }
+}
+
+fn disabled_reason_message(reason: &str) -> String {
+    if crate::is_zh_locale() {
+        format!("已禁用：{reason}")
+    } else {
+        format!("disabled: {reason}")
+    }
+}
+
+fn combined_disabled_description(description: &str, reason: &str) -> String {
+    if crate::is_zh_locale() {
+        format!("{description}（已禁用：{reason}）")
+    } else {
+        format!("{description} (disabled: {reason})")
+    }
+}
+
 /// Apply the shared "menu surface" padding used by bottom-pane overlays.
 ///
 /// Rendering code should generally call [`render_menu_surface`] and then lay
@@ -156,7 +180,7 @@ fn compute_desc_col(
                         let mut spans = row.name_prefix_spans.clone();
                         spans.push(row.name.clone().into());
                         if row.disabled_reason.is_some() {
-                            spans.push(" (disabled)".dim());
+                            spans.push(disabled_suffix().dim());
                         }
                         Line::from(spans).width()
                     })
@@ -168,7 +192,7 @@ fn compute_desc_col(
                         let mut spans = row.name_prefix_spans.clone();
                         spans.push(row.name.clone().into());
                         if row.disabled_reason.is_some() {
-                            spans.push(" (disabled)".dim());
+                            spans.push(disabled_suffix().dim());
                         }
                         Line::from(spans).width()
                     })
@@ -414,9 +438,9 @@ fn adjust_start_for_wrapped_selection_visibility(
 /// dims the description.
 fn build_full_line(row: &GenericDisplayRow, desc_col: usize) -> Line<'static> {
     let combined_description = match (&row.description, &row.disabled_reason) {
-        (Some(desc), Some(reason)) => Some(format!("{desc} (disabled: {reason})")),
+        (Some(desc), Some(reason)) => Some(combined_disabled_description(desc, reason)),
         (Some(desc), None) => Some(desc.clone()),
-        (None, Some(reason)) => Some(format!("disabled: {reason}")),
+        (None, Some(reason)) => Some(disabled_reason_message(reason)),
         (None, None) => None,
     };
 
@@ -470,7 +494,7 @@ fn build_full_line(row: &GenericDisplayRow, desc_col: usize) -> Line<'static> {
     }
 
     if row.disabled_reason.is_some() {
-        name_spans.push(" (disabled)".dim());
+        name_spans.push(disabled_suffix().dim());
     }
 
     let this_name_width = name_prefix_width + Line::from(name_spans.clone()).width();

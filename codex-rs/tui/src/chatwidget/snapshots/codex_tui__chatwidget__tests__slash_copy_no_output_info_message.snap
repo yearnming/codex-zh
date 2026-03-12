@@ -3,4 +3,4 @@ source: tui/src/chatwidget/tests.rs
 assertion_line: 4430
 expression: rendered.clone()
 ---
-• `/copy` is unavailable before the first Codex output or right after a rollback.
+• `/copy` 在首次 Codex 输出前或回滚后不可用。

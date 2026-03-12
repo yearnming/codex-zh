@@ -10,6 +10,18 @@ use std::path::Path;
 use std::process::Stdio;
 use tokio::process::Command;
 
+fn is_zh_locale() -> bool {
+    crate::is_zh_locale()
+}
+
+fn git_status_error(args: &[&str], status: std::process::ExitStatus) -> io::Error {
+    io::Error::other(if is_zh_locale() {
+        format!("git {:?} 失败，状态码 {}", args, status)
+    } else {
+        format!("git {:?} failed with status {}", args, status)
+    })
+}
+
 /// Return value of [`get_git_diff`].
 ///
 /// * `bool` – Whether the current working directory is inside a Git repo.
@@ -74,10 +86,7 @@ async fn run_git_capture_stdout(args: &[&str]) -> io::Result<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     } else {
-        Err(io::Error::other(format!(
-            "git {:?} failed with status {}",
-            args, output.status
-        )))
+        Err(git_status_error(args, output.status))
     }
 }
 
@@ -94,10 +103,7 @@ async fn run_git_capture_diff(args: &[&str]) -> io::Result<String> {
     if output.status.success() || output.status.code() == Some(1) {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     } else {
-        Err(io::Error::other(format!(
-            "git {:?} failed with status {}",
-            args, output.status
-        )))
+        Err(git_status_error(args, output.status))
     }
 }
 

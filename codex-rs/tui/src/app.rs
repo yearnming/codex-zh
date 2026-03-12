@@ -116,7 +116,6 @@ mod pending_interactive_replay;
 
 use self::pending_interactive_replay::PendingInteractiveReplayState;
 
-const EXTERNAL_EDITOR_HINT: &str = "Save and close external editor to continue.";
 const THREAD_EVENT_CHANNEL_CAPACITY: usize = 32768;
 
 fn normalize_locale(value: &str) -> String {
@@ -124,17 +123,16 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
 }
 
 fn err_carry_forward_approval(err: &dyn std::fmt::Display) -> String {
@@ -153,6 +151,8 @@ fn err_carry_forward_sandbox(err: &dyn std::fmt::Display) -> String {
     }
 }
 
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
 fn sandbox_ready_lines() -> Vec<Line<'static>> {
     if is_zh_locale() {
         vec![
@@ -173,6 +173,8 @@ fn sandbox_ready_lines() -> Vec<Line<'static>> {
     }
 }
 
+#[cfg(target_os = "windows")]
+#[allow(dead_code)]
 fn err_enable_windows_sandbox(err: &dyn std::fmt::Display) -> String {
     if is_zh_locale() {
         format!("启用 Windows 沙箱功能失败：{err}")
@@ -257,9 +259,11 @@ fn emit_skill_load_warnings(app_event_tx: &AppEventSender, errors: &[SkillErrorI
 
     let error_count = errors.len();
     app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
-        crate::history_cell::new_warning_event(format!(
-            "Skipped loading {error_count} skill(s) due to invalid SKILL.md files."
-        )),
+        crate::history_cell::new_warning_event(if is_zh_locale() {
+            format!("由于 SKILL.md 无效，跳过加载 {error_count} 个技能。")
+        } else {
+            format!("Skipped loading {error_count} skill(s) due to invalid SKILL.md files.")
+        }),
     )));
 
     for error in errors {
@@ -290,7 +294,13 @@ fn emit_project_config_warnings(app_event_tx: &AppEventSender, config: &Config) 
                 .disabled_reason
                 .as_ref()
                 .map(ToString::to_string)
-                .unwrap_or_else(|| "config.toml is disabled.".to_string()),
+                .unwrap_or_else(|| {
+                    if is_zh_locale() {
+                        "config.toml 已被禁用。".to_string()
+                    } else {
+                        "config.toml is disabled.".to_string()
+                    }
+                }),
         ));
     }
 
@@ -298,11 +308,16 @@ fn emit_project_config_warnings(app_event_tx: &AppEventSender, config: &Config) 
         return;
     }
 
-    let mut message = concat!(
-        "Project config.toml files are disabled in the following folders. ",
-        "Settings in those files are ignored, but skills and exec policies still load.\n",
-    )
-    .to_string();
+    let mut message = if is_zh_locale() {
+        "以下目录中的项目 config.toml 已被禁用。将忽略这些文件中的设置，但技能与执行策略仍会加载。\n"
+            .to_string()
+    } else {
+        concat!(
+            "Project config.toml files are disabled in the following folders. ",
+            "Settings in those files are ignored, but skills and exec policies still load.\n",
+        )
+        .to_string()
+    };
     for (index, (folder, reason)) in disabled_folders.iter().enumerate() {
         let display_index = index + 1;
         message.push_str(&format!("    {display_index}. {folder}\n"));
@@ -827,7 +842,13 @@ impl App {
             .harness_overrides(overrides)
             .build()
             .await
-            .wrap_err_with(|| format!("Failed to rebuild config for cwd {cwd_display}"))
+            .wrap_err_with(|| {
+                if is_zh_locale() {
+                    format!("为当前目录 {cwd_display} 重建配置失败")
+                } else {
+                    format!("Failed to rebuild config for cwd {cwd_display}")
+                }
+            })
     }
 
     async fn refresh_in_memory_config_from_disk(&mut self) -> Result<()> {
@@ -911,9 +932,11 @@ impl App {
                     feature = feature_key,
                     "failed to update constrained feature flags"
                 );
-                self.chat_widget.add_error_message(format!(
-                    "Failed to update experimental feature `{feature_key}`: {err}"
-                ));
+                self.chat_widget.add_error_message(if is_zh_locale() {
+                    format!("更新实验功能 `{feature_key}` 失败：{err}")
+                } else {
+                    format!("Failed to update experimental feature `{feature_key}`: {err}")
+                });
                 continue;
             }
             let effective_enabled = self.config.features.enabled(feature);
@@ -955,20 +978,32 @@ impl App {
 
         if let Err(err) = builder.apply().await {
             tracing::error!(error = %err, "failed to persist feature flags");
-            self.chat_widget
-                .add_error_message(format!("Failed to update experimental features: {err}"));
+            self.chat_widget.add_error_message(if is_zh_locale() {
+                format!("更新实验功能失败：{err}")
+            } else {
+                format!("Failed to update experimental features: {err}")
+            });
         }
     }
 
     fn open_url_in_browser(&mut self, url: String) {
         if let Err(err) = webbrowser::open(&url) {
-            self.chat_widget
-                .add_error_message(format!("Failed to open browser for {url}: {err}"));
+            self.chat_widget.add_error_message(if is_zh_locale() {
+                format!("无法为 {url} 打开浏览器：{err}")
+            } else {
+                format!("Failed to open browser for {url}: {err}")
+            });
             return;
         }
 
-        self.chat_widget
-            .add_info_message(format!("Opened {url} in your browser."), None);
+        self.chat_widget.add_info_message(
+            if is_zh_locale() {
+                format!("已在浏览器中打开 {url}。")
+            } else {
+                format!("Opened {url} in your browser.")
+            },
+            None,
+        );
     }
 
     fn clear_ui_header_lines_with_version(
@@ -1258,16 +1293,20 @@ impl App {
                 Ok(thread) => match thread.submit(op).await {
                     Ok(_) => true,
                     Err(err) => {
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to submit op to thread {thread_id}: {err}"
-                        ));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("向线程 {thread_id} 提交操作失败：{err}")
+                        } else {
+                            format!("Failed to submit op to thread {thread_id}: {err}")
+                        });
                         false
                     }
                 },
                 Err(err) => {
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to find thread {thread_id} for approval response: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("未找到线程 {thread_id} 以提交审批响应：{err}")
+                    } else {
+                        format!("Failed to find thread {thread_id} for approval response: {err}")
+                    });
                     false
                 }
             }
@@ -1426,8 +1465,10 @@ impl App {
         }
 
         if self.agent_picker_threads.is_empty() {
-            self.chat_widget
-                .add_info_message("No agents available yet.".to_string(), None);
+            self.chat_widget.add_info_message(
+                t("No agents available yet.", "暂时没有可用的 Agent。").to_string(),
+                None,
+            );
             return;
         }
 
@@ -1471,7 +1512,7 @@ impl App {
 
         self.chat_widget.show_selection_view(SelectionViewParams {
             title: Some("Multi-agents".to_string()),
-            subtitle: Some("Select an agent to watch".to_string()),
+            subtitle: Some(t("Select an agent to watch", "选择要查看的 Agent").to_string()),
             footer_hint: Some(standard_popup_hint_line()),
             items,
             initial_selected_idx,
@@ -1516,9 +1557,11 @@ impl App {
                     self.mark_agent_picker_thread_closed(thread_id);
                     None
                 } else {
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to attach to agent thread {thread_id}: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("连接到 Agent 线程 {thread_id} 失败：{err}")
+                    } else {
+                        format!("Failed to attach to agent thread {thread_id}: {err}")
+                    });
                     return Ok(());
                 }
             }
@@ -1529,8 +1572,11 @@ impl App {
         self.store_active_thread_receiver().await;
         self.active_thread_id = None;
         let Some((receiver, snapshot)) = self.activate_thread_for_replay(thread_id).await else {
-            self.chat_widget
-                .add_error_message(format!("Agent thread {thread_id} is already active."));
+            self.chat_widget.add_error_message(if is_zh_locale() {
+                format!("Agent 线程 {thread_id} 已处于活动状态。")
+            } else {
+                format!("Agent thread {thread_id} is already active.")
+            });
             if let Some(previous_thread_id) = previous_thread_id {
                 self.activate_thread_channel(previous_thread_id).await;
             }
@@ -1553,7 +1599,11 @@ impl App {
         self.replay_thread_snapshot(snapshot, !is_replay_only);
         if is_replay_only {
             self.chat_widget.add_info_message(
-                format!("Agent thread {thread_id} is closed. Replaying saved transcript."),
+                if is_zh_locale() {
+                    format!("Agent 线程 {thread_id} 已关闭，正在回放已保存的对话记录。")
+                } else {
+                    format!("Agent thread {thread_id} is closed. Replaying saved transcript.")
+                },
                 None,
             );
         }
@@ -1624,7 +1674,10 @@ impl App {
         if let Some(summary) = summary {
             let mut lines: Vec<Line<'static>> = vec![summary.usage_line.clone().into()];
             if let Some(command) = summary.resume_command {
-                let spans = vec!["To continue this session, run ".into(), command.cyan()];
+                let spans = vec![
+                    t("To continue this session, run ", "要继续此会话，请运行 ").into(),
+                    command.cyan(),
+                ];
                 lines.push(spans.into());
             }
             self.chat_widget.add_plain_history_lines(lines);
@@ -1870,7 +1923,11 @@ impl App {
                     .await
                     .wrap_err_with(|| {
                         let path_display = target_session.path.display();
-                        format!("Failed to resume session from {path_display}")
+                        if is_zh_locale() {
+                            format!("从 {path_display} 恢复会话失败")
+                        } else {
+                            format!("Failed to resume session from {path_display}")
+                        }
                     })?;
                 let init = crate::chatwidget::ChatWidgetInit {
                     config: config.clone(),
@@ -1907,7 +1964,11 @@ impl App {
                     .await
                     .wrap_err_with(|| {
                         let path_display = target_session.path.display();
-                        format!("Failed to fork session from {path_display}")
+                        if is_zh_locale() {
+                            format!("从 {path_display} 分叉会话失败")
+                        } else {
+                            format!("Failed to fork session from {path_display}")
+                        }
                     })?;
                 let init = crate::chatwidget::ChatWidgetInit {
                     config: config.clone(),
@@ -2196,9 +2257,11 @@ impl App {
                         {
                             Ok(cfg) => cfg,
                             Err(err) => {
-                                self.chat_widget.add_error_message(format!(
-                                    "Failed to rebuild configuration for resume: {err}"
-                                ));
+                                self.chat_widget.add_error_message(if is_zh_locale() {
+                                    format!("为恢复会话重建配置失败：{err}")
+                                } else {
+                                    format!("Failed to rebuild configuration for resume: {err}")
+                                });
                                 return Ok(AppRunControl::Continue);
                             }
                         };
@@ -2237,7 +2300,11 @@ impl App {
                                         vec![summary.usage_line.clone().into()];
                                     if let Some(command) = summary.resume_command {
                                         let spans = vec![
-                                            "To continue this session, run ".into(),
+                                            t(
+                                                "To continue this session, run ",
+                                                "要继续此会话，请运行 ",
+                                            )
+                                            .into(),
                                             command.cyan(),
                                         ];
                                         lines.push(spans.into());
@@ -2247,9 +2314,11 @@ impl App {
                             }
                             Err(err) => {
                                 let path_display = target_session.path.display();
-                                self.chat_widget.add_error_message(format!(
-                                    "Failed to resume session from {path_display}: {err}"
-                                ));
+                                self.chat_widget.add_error_message(if is_zh_locale() {
+                                    format!("从 {path_display} 恢复会话失败：{err}")
+                                } else {
+                                    format!("Failed to resume session from {path_display}: {err}")
+                                });
                             }
                         }
                     }
@@ -2302,7 +2371,11 @@ impl App {
                                         vec![summary.usage_line.clone().into()];
                                     if let Some(command) = summary.resume_command {
                                         let spans = vec![
-                                            "To continue this session, run ".into(),
+                                            t(
+                                                "To continue this session, run ",
+                                                "要继续此会话，请运行 ",
+                                            )
+                                            .into(),
                                             command.cyan(),
                                         ];
                                         lines.push(spans.into());
@@ -2312,21 +2385,31 @@ impl App {
                             }
                             Err(err) => {
                                 let path_display = path.display();
-                                self.chat_widget.add_error_message(format!(
-                                    "Failed to fork current session from {path_display}: {err}"
-                                ));
+                                self.chat_widget.add_error_message(if is_zh_locale() {
+                                    format!("从 {path_display} 分叉当前会话失败：{err}")
+                                } else {
+                                    format!(
+                                        "Failed to fork current session from {path_display}: {err}"
+                                    )
+                                });
                             }
                         }
                     } else {
                         self.chat_widget.add_error_message(
-                            "A thread must contain at least one turn before it can be forked."
-                                .to_string(),
+                            t(
+                                "A thread must contain at least one turn before it can be forked.",
+                                "线程至少需要包含一次对话才能分叉。",
+                            )
+                            .to_string(),
                         );
                     }
                 } else {
                     self.chat_widget.add_error_message(
-                        "A thread must contain at least one turn before it can be forked."
-                            .to_string(),
+                        t(
+                            "A thread must contain at least one turn before it can be forked.",
+                            "线程至少需要包含一次对话才能分叉。",
+                        )
+                        .to_string(),
                     );
                 }
 
@@ -2415,7 +2498,7 @@ impl App {
                 // Enter alternate screen using TUI helper and build pager lines
                 let _ = tui.enter_alt_screen();
                 let pager_lines: Vec<ratatui::text::Line<'static>> = if text.trim().is_empty() {
-                    vec!["No changes detected.".italic().into()]
+                    vec![t("No changes detected.", "未检测到更改。").italic().into()]
                 } else {
                     text.lines().map(ansi_escape_line).collect()
                 };
@@ -2677,7 +2760,11 @@ impl App {
                 {
                     self.chat_widget
                         .add_to_history(history_cell::new_info_event(
-                            format!("Granting sandbox read access to {path} ..."),
+                            if is_zh_locale() {
+                                format!("正在为 {path} 授予沙箱读取权限……")
+                            } else {
+                                format!("Granting sandbox read access to {path} ...")
+                            },
                             None,
                         ));
 
@@ -2719,12 +2806,20 @@ impl App {
             AppEvent::WindowsSandboxGrantReadRootCompleted { path, error } => match error {
                 Some(err) => {
                     self.chat_widget
-                        .add_to_history(history_cell::new_error_event(format!("Error: {err}")));
+                        .add_to_history(history_cell::new_error_event(if is_zh_locale() {
+                            format!("错误：{err}")
+                        } else {
+                            format!("Error: {err}")
+                        }));
                 }
                 None => {
                     self.chat_widget
                         .add_to_history(history_cell::new_info_event(
-                            format!("Sandbox read access granted for {}", path.display()),
+                            if is_zh_locale() {
+                                format!("已授予沙箱读取权限：{}", path.display())
+                            } else {
+                                format!("Sandbox read access granted for {}", path.display())
+                            },
                             None,
                         ));
                 }
@@ -2839,17 +2934,33 @@ impl App {
                     Ok(()) => {
                         let effort_label = effort
                             .map(|selected_effort| selected_effort.to_string())
-                            .unwrap_or_else(|| "default".to_string());
+                            .unwrap_or_else(|| t("default", "默认").to_string());
                         tracing::info!("Selected model: {model}, Selected effort: {effort_label}");
-                        let mut message = format!("Model changed to {model}");
+                        let mut message = if is_zh_locale() {
+                            format!("模型已切换为 {model}")
+                        } else {
+                            format!("Model changed to {model}")
+                        };
                         if let Some(label) = Self::reasoning_label_for(&model, effort) {
-                            message.push(' ');
-                            message.push_str(label);
+                            if is_zh_locale() {
+                                message.push_str("（推理：");
+                                message.push_str(label);
+                                message.push('）');
+                            } else {
+                                message.push(' ');
+                                message.push_str(label);
+                            }
                         }
                         if let Some(profile) = profile {
-                            message.push_str(" for ");
-                            message.push_str(profile);
-                            message.push_str(" profile");
+                            if is_zh_locale() {
+                                message.push_str("（配置：");
+                                message.push_str(profile);
+                                message.push('）');
+                            } else {
+                                message.push_str(" for ");
+                                message.push_str(profile);
+                                message.push_str(" profile");
+                            }
                         }
                         self.chat_widget.add_info_message(message, None);
                     }
@@ -2859,12 +2970,17 @@ impl App {
                             "failed to persist model selection"
                         );
                         if let Some(profile) = profile {
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to save model for profile `{profile}`: {err}"
-                            ));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存配置 `{profile}` 的模型失败：{err}")
+                            } else {
+                                format!("Failed to save model for profile `{profile}`: {err}")
+                            });
                         } else {
-                            self.chat_widget
-                                .add_error_message(format!("Failed to save default model: {err}"));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存默认模型失败：{err}")
+                            } else {
+                                format!("Failed to save default model: {err}")
+                            });
                         }
                     }
                 }
@@ -2879,11 +2995,21 @@ impl App {
                 {
                     Ok(()) => {
                         let label = Self::personality_label(personality);
-                        let mut message = format!("Personality set to {label}");
+                        let mut message = if is_zh_locale() {
+                            format!("人格已设置为 {label}")
+                        } else {
+                            format!("Personality set to {label}")
+                        };
                         if let Some(profile) = profile {
-                            message.push_str(" for ");
-                            message.push_str(profile);
-                            message.push_str(" profile");
+                            if is_zh_locale() {
+                                message.push_str("（配置：");
+                                message.push_str(profile);
+                                message.push('）');
+                            } else {
+                                message.push_str(" for ");
+                                message.push_str(profile);
+                                message.push_str(" profile");
+                            }
                         }
                         self.chat_widget.add_info_message(message, None);
                     }
@@ -2893,13 +3019,17 @@ impl App {
                             "failed to persist personality selection"
                         );
                         if let Some(profile) = profile {
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to save personality for profile `{profile}`: {err}"
-                            ));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存配置 `{profile}` 的人格失败：{err}")
+                            } else {
+                                format!("Failed to save personality for profile `{profile}`: {err}")
+                            });
                         } else {
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to save default personality: {err}"
-                            ));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存默认人格失败：{err}")
+                            } else {
+                                format!("Failed to save default personality: {err}")
+                            });
                         }
                     }
                 }
@@ -2914,25 +3044,43 @@ impl App {
                     .await
                 {
                     Ok(()) => {
-                        let status = if service_tier.is_some() { "on" } else { "off" };
-                        let mut message = format!("Fast mode set to {status}");
+                        let status = if service_tier.is_some() {
+                            t("on", "开启")
+                        } else {
+                            t("off", "关闭")
+                        };
+                        let mut message = if is_zh_locale() {
+                            format!("快速模式已设置为 {status}")
+                        } else {
+                            format!("Fast mode set to {status}")
+                        };
                         if let Some(profile) = profile {
-                            message.push_str(" for ");
-                            message.push_str(profile);
-                            message.push_str(" profile");
+                            if is_zh_locale() {
+                                message.push_str("（配置：");
+                                message.push_str(profile);
+                                message.push('）');
+                            } else {
+                                message.push_str(" for ");
+                                message.push_str(profile);
+                                message.push_str(" profile");
+                            }
                         }
                         self.chat_widget.add_info_message(message, None);
                     }
                     Err(err) => {
                         tracing::error!(error = %err, "failed to persist fast mode selection");
                         if let Some(profile) = profile {
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to save Fast mode for profile `{profile}`: {err}"
-                            ));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存配置 `{profile}` 的快速模式失败：{err}")
+                            } else {
+                                format!("Failed to save Fast mode for profile `{profile}`: {err}")
+                            });
                         } else {
-                            self.chat_widget.add_error_message(format!(
-                                "Failed to save default Fast mode: {err}"
-                            ));
+                            self.chat_widget.add_error_message(if is_zh_locale() {
+                                format!("保存默认快速模式失败：{err}")
+                            } else {
+                                format!("Failed to save default Fast mode: {err}")
+                            });
                         }
                     }
                 }
@@ -2965,9 +3113,14 @@ impl App {
                         if self.chat_widget.realtime_conversation_is_live() {
                             self.chat_widget.open_realtime_audio_restart_prompt(kind);
                         } else {
-                            let selection = name.unwrap_or_else(|| "System default".to_string());
+                            let selection =
+                                name.unwrap_or_else(|| t("System default", "系统默认").to_string());
                             self.chat_widget.add_info_message(
-                                format!("Realtime {} set to {selection}", kind.noun()),
+                                if is_zh_locale() {
+                                    format!("实时{}已设置为 {selection}", kind.noun())
+                                } else {
+                                    format!("Realtime {} set to {selection}", kind.noun())
+                                },
                                 None,
                             );
                         }
@@ -2977,10 +3130,12 @@ impl App {
                             error = %err,
                             "failed to persist realtime audio selection"
                         );
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to save realtime {}: {err}",
-                            kind.noun()
-                        ));
+                        let kind_label = kind.noun();
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("保存实时{kind_label}失败：{err}")
+                        } else {
+                            format!("Failed to save realtime {kind_label}: {err}")
+                        });
                     }
                 }
             }
@@ -2991,8 +3146,11 @@ impl App {
                 self.runtime_approval_policy_override = Some(policy);
                 if let Err(err) = self.config.permissions.approval_policy.set(policy) {
                     tracing::warn!(%err, "failed to set approval policy on app config");
-                    self.chat_widget
-                        .add_error_message(format!("Failed to set approval policy: {err}"));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("设置审批策略失败：{err}")
+                    } else {
+                        format!("Failed to set approval policy: {err}")
+                    });
                     return Ok(AppRunControl::Continue);
                 }
                 self.chat_widget.set_approval_policy(policy);
@@ -3008,14 +3166,20 @@ impl App {
 
                 if let Err(err) = self.config.permissions.sandbox_policy.set(policy) {
                     tracing::warn!(%err, "failed to set sandbox policy on app config");
-                    self.chat_widget
-                        .add_error_message(format!("Failed to set sandbox policy: {err}"));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("设置沙箱策略失败：{err}")
+                    } else {
+                        format!("Failed to set sandbox policy: {err}")
+                    });
                     return Ok(AppRunControl::Continue);
                 }
                 if let Err(err) = self.chat_widget.set_sandbox_policy(policy_for_chat) {
                     tracing::warn!(%err, "failed to set sandbox policy on chat config");
-                    self.chat_widget
-                        .add_error_message(format!("Failed to set sandbox policy: {err}"));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("设置沙箱策略失败：{err}")
+                    } else {
+                        format!("Failed to set sandbox policy: {err}")
+                    });
                     return Ok(AppRunControl::Continue);
                 }
                 self.runtime_sandbox_policy_override =
@@ -3082,9 +3246,11 @@ impl App {
                         error = %err,
                         "failed to persist full access warning acknowledgement"
                     );
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to save full access confirmation preference: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("保存完全访问确认偏好失败：{err}")
+                    } else {
+                        format!("Failed to save full access confirmation preference: {err}")
+                    });
                 }
             }
             AppEvent::PersistWorldWritableWarningAcknowledged => {
@@ -3097,9 +3263,11 @@ impl App {
                         error = %err,
                         "failed to persist world-writable warning acknowledgement"
                     );
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to save Agent mode warning preference: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("保存 Agent 模式警告偏好失败：{err}")
+                    } else {
+                        format!("Failed to save Agent mode warning preference: {err}")
+                    });
                 }
             }
             AppEvent::PersistRateLimitSwitchPromptHidden => {
@@ -3112,9 +3280,11 @@ impl App {
                         error = %err,
                         "failed to persist rate limit switch prompt preference"
                     );
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to save rate limit reminder preference: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("保存速率限制提醒偏好失败：{err}")
+                    } else {
+                        format!("Failed to save rate limit reminder preference: {err}")
+                    });
                 }
             }
             AppEvent::PersistPlanModeReasoningEffort(effort) => {
@@ -3146,13 +3316,19 @@ impl App {
                         "failed to persist plan mode reasoning effort"
                     );
                     if let Some(profile) = profile {
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to save Plan mode reasoning effort for profile `{profile}`: {err}"
-                        ));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("保存配置 `{profile}` 的计划模式推理强度失败：{err}")
+                        } else {
+                            format!(
+                                "Failed to save Plan mode reasoning effort for profile `{profile}`: {err}"
+                            )
+                        });
                     } else {
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to save Plan mode reasoning effort: {err}"
-                        ));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("保存计划模式推理强度失败：{err}")
+                        } else {
+                            format!("Failed to save Plan mode reasoning effort: {err}")
+                        });
                     }
                 }
             }
@@ -3169,9 +3345,11 @@ impl App {
                         error = %err,
                         "failed to persist model migration prompt acknowledgement"
                     );
-                    self.chat_widget.add_error_message(format!(
-                        "Failed to save model migration prompt preference: {err}"
-                    ));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("保存模型迁移提示偏好失败：{err}")
+                    } else {
+                        format!("Failed to save model migration prompt preference: {err}")
+                    });
                 }
             }
             AppEvent::OpenApprovalsPopup => {
@@ -3210,9 +3388,11 @@ impl App {
                     }
                     Err(err) => {
                         let path_display = path.display();
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to update skill config for {path_display}: {err}"
-                        ));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("更新技能配置 {path_display} 失败：{err}")
+                        } else {
+                            format!("Failed to update skill config for {path_display}: {err}")
+                        });
                     }
                 }
             }
@@ -3259,9 +3439,11 @@ impl App {
                         self.chat_widget.submit_op(Op::ReloadUserConfig);
                     }
                     Err(err) => {
-                        self.chat_widget.add_error_message(format!(
-                            "Failed to update app config for {id}: {err}"
-                        ));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("更新应用配置 {id} 失败：{err}")
+                        } else {
+                            format!("Failed to update app config for {id}: {err}")
+                        });
                     }
                 }
             }
@@ -3313,14 +3495,17 @@ impl App {
                     let _ = tui.enter_alt_screen();
                     let mut lines = Vec::new();
                     if let Some(reason) = reason {
-                        lines.push(Line::from(vec!["Reason: ".into(), reason.italic()]));
+                        lines.push(Line::from(vec![
+                            t("Reason: ", "原因：").into(),
+                            reason.italic(),
+                        ]));
                         lines.push(Line::from(""));
                     }
                     if let Some(rule_line) =
                         crate::bottom_pane::format_additional_permissions_rule(&permissions)
                     {
                         lines.push(Line::from(vec![
-                            "Permission rule: ".into(),
+                            t("Permission rule: ", "权限规则：").into(),
                             rule_line.cyan(),
                         ]));
                     }
@@ -3336,7 +3521,7 @@ impl App {
                 } => {
                     let _ = tui.enter_alt_screen();
                     let paragraph = Paragraph::new(vec![
-                        Line::from(vec!["Server: ".into(), server_name.bold()]),
+                        Line::from(vec![t("Server: ", "服务器：").into(), server_name.bold()]),
                         Line::from(""),
                         Line::from(message),
                     ])
@@ -3377,8 +3562,11 @@ impl App {
                     }
                     Err(err) => {
                         tracing::error!(error = %err, "failed to persist status line items; keeping previous selection");
-                        self.chat_widget
-                            .add_error_message(format!("Failed to save status line items: {err}"));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("保存状态行项目失败：{err}")
+                        } else {
+                            format!("Failed to save status line items: {err}")
+                        });
                     }
                 }
             }
@@ -3412,8 +3600,11 @@ impl App {
                     Err(err) => {
                         self.restore_runtime_theme_from_config();
                         tracing::error!(error = %err, "failed to persist theme selection");
-                        self.chat_widget
-                            .add_error_message(format!("Failed to save theme: {err}"));
+                        self.chat_widget.add_error_message(if is_zh_locale() {
+                            format!("保存主题失败：{err}")
+                        } else {
+                            format!("Failed to save theme: {err}")
+                        });
                     }
                 }
             }
@@ -3497,16 +3688,27 @@ impl App {
             self.select_agent_thread(tui, primary_thread_id).await?;
             if self.active_thread_id == Some(primary_thread_id) {
                 self.chat_widget.add_info_message(
-                    format!(
-                        "Agent thread {closed_thread_id} closed. Switched back to main thread."
-                    ),
+                    if is_zh_locale() {
+                        format!("Agent 线程 {closed_thread_id} 已关闭，已切回主线程。")
+                    } else {
+                        format!(
+                            "Agent thread {closed_thread_id} closed. Switched back to main thread."
+                        )
+                    },
                     None,
                 );
             } else {
                 self.clear_active_thread().await;
-                self.chat_widget.add_error_message(format!(
-                    "Agent thread {closed_thread_id} closed. Failed to switch back to main thread {primary_thread_id}.",
-                ));
+                let message = if is_zh_locale() {
+                    format!(
+                        "Agent 线程 {closed_thread_id} 已关闭，切回主线程 {primary_thread_id} 失败。"
+                    )
+                } else {
+                    format!(
+                        "Agent thread {closed_thread_id} closed. Failed to switch back to main thread {primary_thread_id}."
+                    )
+                };
+                self.chat_widget.add_error_message(message);
             }
             return Ok(());
         }
@@ -3583,13 +3785,24 @@ impl App {
     }
 
     fn reasoning_label(reasoning_effort: Option<ReasoningEffortConfig>) -> &'static str {
-        match reasoning_effort {
-            Some(ReasoningEffortConfig::Minimal) => "minimal",
-            Some(ReasoningEffortConfig::Low) => "low",
-            Some(ReasoningEffortConfig::Medium) => "medium",
-            Some(ReasoningEffortConfig::High) => "high",
-            Some(ReasoningEffortConfig::XHigh) => "xhigh",
-            None | Some(ReasoningEffortConfig::None) => "default",
+        if is_zh_locale() {
+            match reasoning_effort {
+                Some(ReasoningEffortConfig::Minimal) => "最小",
+                Some(ReasoningEffortConfig::Low) => "低",
+                Some(ReasoningEffortConfig::Medium) => "中",
+                Some(ReasoningEffortConfig::High) => "高",
+                Some(ReasoningEffortConfig::XHigh) => "超高",
+                None | Some(ReasoningEffortConfig::None) => "默认",
+            }
+        } else {
+            match reasoning_effort {
+                Some(ReasoningEffortConfig::Minimal) => "minimal",
+                Some(ReasoningEffortConfig::Low) => "low",
+                Some(ReasoningEffortConfig::Medium) => "medium",
+                Some(ReasoningEffortConfig::High) => "high",
+                Some(ReasoningEffortConfig::XHigh) => "xhigh",
+                None | Some(ReasoningEffortConfig::None) => "default",
+            }
         }
     }
 
@@ -3640,10 +3853,18 @@ impl App {
     }
 
     fn personality_label(personality: Personality) -> &'static str {
-        match personality {
-            Personality::None => "None",
-            Personality::Friendly => "Friendly",
-            Personality::Pragmatic => "Pragmatic",
+        if is_zh_locale() {
+            match personality {
+                Personality::None => "无",
+                Personality::Friendly => "友好",
+                Personality::Pragmatic => "务实",
+            }
+        } else {
+            match personality {
+                Personality::None => "None",
+                Personality::Friendly => "Friendly",
+                Personality::Pragmatic => "Pragmatic",
+            }
         }
     }
 
@@ -3720,7 +3941,10 @@ impl App {
         let hint = if is_zh_locale() {
             "保存并关闭外部编辑器以继续。"
         } else {
-            EXTERNAL_EDITOR_HINT
+            t(
+                "Save and close external editor to continue.",
+                "保存并关闭外部编辑器以继续。",
+            )
         };
         self.chat_widget
             .set_footer_hint_override(Some(vec![(hint.to_string(), String::new())]));
@@ -3758,8 +3982,11 @@ impl App {
                 }
                 if let Err(err) = self.clear_terminal_ui(tui, false) {
                     tracing::warn!(error = %err, "failed to clear terminal UI");
-                    self.chat_widget
-                        .add_error_message(format!("Failed to clear terminal UI: {err}"));
+                    self.chat_widget.add_error_message(if is_zh_locale() {
+                        format!("清空终端界面失败：{err}")
+                    } else {
+                        format!("Failed to clear terminal UI: {err}")
+                    });
                 } else {
                     self.reset_app_ui_state_after_clear();
                     self.queue_clear_ui_header(tui);
@@ -6786,10 +7013,7 @@ mod tests {
         let conversation = ThreadId::from_string("123e4567-e89b-12d3-a456-426614174000").unwrap();
 
         let summary = session_summary(usage, Some(conversation), None).expect("summary");
-        assert_eq!(
-            summary.usage_line,
-            "Token usage: total=12 input=10 output=2"
-        );
+        assert_eq!(summary.usage_line, "Token 用量：总计=12 输入=10 输出=2");
         assert_eq!(
             summary.resume_command,
             Some("codex resume 123e4567-e89b-12d3-a456-426614174000".to_string())

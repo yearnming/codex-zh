@@ -53,6 +53,10 @@ mod frame_requester;
 #[cfg(unix)]
 mod job_control;
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 /// Target frame interval for UI redraw scheduling.
 pub(crate) const TARGET_FRAME_INTERVAL: Duration = frame_rate_limiter::MIN_FRAME_INTERVAL;
 
@@ -92,9 +96,10 @@ impl Command for EnableAlternateScroll {
 
     #[cfg(windows)]
     fn execute_winapi(&self) -> Result<()> {
-        Err(std::io::Error::other(
+        Err(std::io::Error::other(t(
             "tried to execute EnableAlternateScroll using WinAPI; use ANSI instead",
-        ))
+            "尝试使用 WinAPI 执行 EnableAlternateScroll；请改用 ANSI",
+        )))
     }
 
     #[cfg(windows)]
@@ -113,9 +118,10 @@ impl Command for DisableAlternateScroll {
 
     #[cfg(windows)]
     fn execute_winapi(&self) -> Result<()> {
-        Err(std::io::Error::other(
+        Err(std::io::Error::other(t(
             "tried to execute DisableAlternateScroll using WinAPI; use ANSI instead",
-        ))
+            "尝试使用 WinAPI 执行 DisableAlternateScroll；请改用 ANSI",
+        )))
     }
 
     #[cfg(windows)]
@@ -207,10 +213,16 @@ pub(crate) fn flush_terminal_input_buffer() {}
 /// Initialize the terminal (inline viewport; history stays in normal scrollback)
 pub fn init() -> Result<Terminal> {
     if !stdin().is_terminal() {
-        return Err(std::io::Error::other("stdin is not a terminal"));
+        return Err(std::io::Error::other(t(
+            "stdin is not a terminal",
+            "stdin 不是终端",
+        )));
     }
     if !stdout().is_terminal() {
-        return Err(std::io::Error::other("stdout is not a terminal"));
+        return Err(std::io::Error::other(t(
+            "stdout is not a terminal",
+            "stdout 不是终端",
+        )));
     }
     set_modes()?;
 

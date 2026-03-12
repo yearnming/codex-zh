@@ -5,7 +5,7 @@ expression: "format!(\"{buf:?}\")"
 Buffer {
     area: Rect { x: 0, y: 0, width: 40, height: 3 },
     content: [
-        "• Queued follow-up messages             ",
+        "• 已排队的后续消息             ",
         "  ↳ Hello, world!                       ",
         "    ⌥ + ↑ edit last queued message      ",
     ],

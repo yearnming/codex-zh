@@ -31,15 +31,10 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }
@@ -54,6 +49,10 @@ fn t(label_en: &str, label_zh: &str) -> String {
 
 fn t_opt(label_en: &str, label_zh: &str) -> Option<String> {
     Some(t(label_en, label_zh))
+}
+
+fn t_static(label_en: &'static str, label_zh: &'static str) -> &'static str {
+    if is_zh_locale() { label_zh } else { label_en }
 }
 
 use crate::app_event::AppEvent;
@@ -72,8 +71,6 @@ use crate::bottom_pane::selection_popup_common::render_menu_surface;
 use crate::bottom_pane::selection_popup_common::render_rows;
 use crate::render::renderable::Renderable;
 
-const ANSWER_PLACEHOLDER: &str = "Type your answer";
-const OPTIONAL_ANSWER_PLACEHOLDER: &str = "Type your answer (optional)";
 const FOOTER_SEPARATOR: &str = " | ";
 const MIN_COMPOSER_HEIGHT: u16 = 3;
 const MIN_OVERLAY_HEIGHT: u16 = 8;
@@ -88,6 +85,14 @@ const APPROVAL_META_KIND_MCP_TOOL_CALL: &str = "mcp_tool_call";
 const APPROVAL_PERSIST_KEY: &str = "persist";
 const APPROVAL_PERSIST_SESSION_VALUE: &str = "session";
 const APPROVAL_PERSIST_ALWAYS_VALUE: &str = "always";
+
+fn answer_placeholder() -> &'static str {
+    t_static("Type your answer", "请输入回答")
+}
+
+fn optional_answer_placeholder() -> &'static str {
+    t_static("Type your answer (optional)", "输入你的回答（可选）")
+}
 
 #[derive(Clone, PartialEq, Default)]
 struct ComposerDraft {
@@ -526,7 +531,7 @@ impl McpServerElicitationOverlay {
             has_input_focus,
             app_event_tx.clone(),
             enhanced_keys_supported,
-            ANSWER_PLACEHOLDER.to_string(),
+            answer_placeholder().to_string(),
             disable_paste_burst,
             ChatComposerConfig::plain_text(),
         );
@@ -660,11 +665,11 @@ impl McpServerElicitationOverlay {
     }
 
     fn answer_placeholder(&self) -> &'static str {
-        self.current_field().map_or(ANSWER_PLACEHOLDER, |field| {
+        self.current_field().map_or(answer_placeholder(), |field| {
             if field.required {
-                ANSWER_PLACEHOLDER
+                answer_placeholder()
             } else {
-                OPTIONAL_ANSWER_PLACEHOLDER
+                optional_answer_placeholder()
             }
         })
     }
@@ -758,30 +763,67 @@ impl McpServerElicitationOverlay {
 
     fn footer_tips(&self) -> Vec<FooterTip> {
         let mut tips = Vec::new();
+        let is_zh = is_zh_locale();
         let is_last_field = self.current_index().saturating_add(1) >= self.field_count();
         if self.current_field_is_select() {
             if self.field_count() == 1 {
-                tips.push(FooterTip::highlighted("enter to submit"));
+                tips.push(FooterTip::highlighted(if is_zh {
+                    "回车提交"
+                } else {
+                    "enter to submit"
+                }));
             } else if is_last_field {
-                tips.push(FooterTip::highlighted("enter to submit all"));
+                tips.push(FooterTip::highlighted(if is_zh {
+                    "回车提交全部"
+                } else {
+                    "enter to submit all"
+                }));
             } else {
-                tips.push(FooterTip::new("enter to submit answer"));
+                tips.push(FooterTip::new(if is_zh {
+                    "回车提交回答"
+                } else {
+                    "enter to submit answer"
+                }));
             }
         } else if self.field_count() == 1 {
-            tips.push(FooterTip::highlighted("enter to submit"));
+            tips.push(FooterTip::highlighted(if is_zh {
+                "回车提交"
+            } else {
+                "enter to submit"
+            }));
         } else if is_last_field {
-            tips.push(FooterTip::highlighted("enter to submit all"));
+            tips.push(FooterTip::highlighted(if is_zh {
+                "回车提交全部"
+            } else {
+                "enter to submit all"
+            }));
         } else {
-            tips.push(FooterTip::new("enter to submit answer"));
+            tips.push(FooterTip::new(if is_zh {
+                "回车提交回答"
+            } else {
+                "enter to submit answer"
+            }));
         }
         if self.field_count() > 1 {
             if self.current_field_is_select() {
-                tips.push(FooterTip::new("←/→ to navigate fields"));
+                tips.push(FooterTip::new(if is_zh {
+                    "←/→ 切换字段"
+                } else {
+                    "←/→ to navigate fields"
+                }));
             } else {
-                tips.push(FooterTip::new("ctrl + p / ctrl + n change field"));
+                tips.push(FooterTip::new(if is_zh {
+                    "Ctrl+P / Ctrl+N 切换字段"
+                } else {
+                    "ctrl + p / ctrl + n change field"
+                }));
             }
         }
-        tips.push(FooterTip::new("esc to cancel"));
+        tips.push(FooterTip::new(if is_zh {
+            "Esc 取消"
+        } else {
+            "esc to cancel"
+        }));
         tips
     }
 
@@ -923,7 +965,10 @@ impl McpServerElicitationOverlay {
     fn submit_answers(&mut self) {
         self.save_current_draft();
         if let Some(idx) = self.first_required_unanswered_index() {
-            self.validation_error = Some("Answer required fields before submitting.".to_string());
+            self.validation_error = Some(t(
+                "Answer required fields before submitting.",
+                "请先填写必答字段。",
+            ));
             self.jump_to_field(idx);
             return;
         }
@@ -1102,7 +1147,11 @@ impl McpServerElicitationOverlay {
         let option_tip = if options_hidden {
             let selected = self.selected_option_index().unwrap_or(0).saturating_add(1);
             let total = self.options_len();
-            Some(FooterTip::new(format!("option {selected}/{total}")))
+            Some(FooterTip::new(if crate::is_zh_locale() {
+                format!("选项 {selected}/{total}")
+            } else {
+                format!("option {selected}/{total}")
+            }))
         } else {
             None
         };
@@ -1216,14 +1265,32 @@ impl Renderable for McpServerElicitationOverlay {
         let progress_line = if self.field_count() > 0 {
             let idx = self.current_index() + 1;
             let total = self.field_count();
-            let base = format!("Field {idx}/{total}");
+            let base = if is_zh_locale() {
+                format!("字段 {idx}/{total}")
+            } else {
+                format!("Field {idx}/{total}")
+            };
             if unanswered > 0 {
-                Line::from(format!("{base} ({unanswered} required unanswered)").dim())
+                Line::from(
+                    if is_zh_locale() {
+                        format!("{base}（{unanswered} 个必答未完成）")
+                    } else {
+                        format!("{base} ({unanswered} required unanswered)")
+                    }
+                    .dim(),
+                )
             } else {
                 Line::from(base.dim())
             }
         } else {
-            Line::from("No fields".dim())
+            Line::from(
+                if is_zh_locale() {
+                    "暂无字段"
+                } else {
+                    "No fields"
+                }
+                .dim(),
+            )
         };
         Paragraph::new(progress_line).render(progress_area, buf);
         self.render_prompt(prompt_area, buf);

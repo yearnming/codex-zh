@@ -36,9 +36,9 @@ expression: term.backend().vt100().screen().contents()
   └ Search Change Approved
     Read diff_render.rs
 
-• Investigating rendering code (0s • esc to interrupt)
+• Investigating rendering code (0秒 • 按 esc 中断)
 
 
 › Summarize recent commits
 
-  tab to queue message                                       100% context left
+  tab 排队消息                                       100% 剩余上下文

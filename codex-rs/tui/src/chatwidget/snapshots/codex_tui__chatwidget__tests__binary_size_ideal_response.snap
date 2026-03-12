@@ -9,7 +9,7 @@ expression: "lines[start_idx..].join(\"\\n\")"
   is set up. I should look into the Cargo.toml file to confirm features and
   profiles without needing to edit any code. Let's get started on this!
 
-─ Worked for 0s ────────────────────────────────────────────────────────────────
+─ 耗时 0秒 ─────────────────────────────────────────────────────────────────────
 
 • I’m going to scan the workspace and Cargo manifests to see build profiles and
   dependencies that impact binary size. Then I’ll summarize the main causes.
@@ -26,7 +26,7 @@ expression: "lines[start_idx..].join(\"\\n\")"
   through crates for heavy dependencies in Cargo.toml, including cli, core,
   exec, linux-sandbox, tui, login, ollama, and mcp.
 
-• Ran for d in ansi-escape apply-patch arg0 cli common core exec execpolicy
+• 已运行 for d in ansi-escape apply-patch arg0 cli common core exec execpolicy
   │ file-search linux-sandbox login mcp-client mcp-server ollama
   │ tui; do echo "--- $d/Cargo.toml"; sed -n '1,200p' $d/Cargo.toml; echo;
   │ … +1 lines
@@ -69,7 +69,7 @@ expression: "lines[start_idx..].join(\"\\n\")"
   crate and tracing-subscriber also contribute to size increases.
 
   With static linking per binary being standard in Rust, it leads to multiple
-  copies of the same dependencies unless cdylibs are used. That makes the
+  copies of the same dependencies unless cdylibs are 已使用. That makes the
   compile times longer, but using LTO helps reduce bloat somewhat through
   deduplication.
 
@@ -112,7 +112,7 @@ expression: "lines[start_idx..].join(\"\\n\")"
   "Main Causes" and "Build-Mode Notes." I can also include brief suggestions for
   reducing size, but I want to stay focused on answering the user's question.
 
-─ Worked for 0s ────────────────────────────────────────────────────────────────
+─ 耗时 0秒 ─────────────────────────────────────────────────────────────────────
 
 • Here’s what’s driving size in this workspace’s binaries.
 
@@ -131,7 +131,7 @@ expression: "lines[start_idx..].join(\"\\n\")"
   - Parsers/VMs: tree-sitter + tree-sitter-bash (in core and apply-patch) and
   starlark (in execpolicy) include sizeable parser/VM tables and runtimes.
   - Tokio runtime: Broad tokio features (rt-multi-thread, macros, process,
-  signal) across many crates inflate code size even if only subsets are used
+  signal) across many crates inflate code size even if only subsets are 已使用
   per bin.
   - Panic + backtraces: Default panic = unwind and backtrace support keep
   unwinding tables and symbols that add weight.

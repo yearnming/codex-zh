@@ -4,12 +4,12 @@ assertion_line: 439
 expression: "render_lines(&view, 72)"
 ---
                                                                         
-  Enable/Disable Skills                                                 
-  Turn skills on or off. Your changes are saved automatically.          
+  启用/停用技能                                                            
+  开启或关闭技能。更改会自动保存。                                             
                                                                         
-  Type to search skills                                                 
+  输入以搜索技能                                                         
   >                                                                     
 › [x] Repo Scout        Summarize the repo layout                       
   [ ] Changelog Writer  Draft release notes                             
                                                                         
-  Press space or enter to toggle; esc to close
+  按 space 或 enter 切换；按 esc 关闭

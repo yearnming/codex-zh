@@ -25,11 +25,28 @@ use ratatui::style::Stylize as _;
 use ratatui::text::Line;
 use ratatui::widgets::Clear;
 use ratatui::widgets::WidgetRef;
+use std::env;
 use tokio_stream::StreamExt;
 
 pub(crate) enum UpdatePromptOutcome {
     Continue,
     RunUpdate(UpdateAction),
+}
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
 }
 
 pub(crate) async fn run_update_prompt_if_needed(
@@ -191,7 +208,7 @@ impl WidgetRef for &UpdatePromptScreen {
         column.push("");
         column.push(Line::from(vec![
             padded_emoji("  ✨").bold().cyan(),
-            "Update available!".bold(),
+            t("Update available!", "发现新版本！").bold(),
             " ".into(),
             format!(
                 "{current} -> {latest}",
@@ -203,7 +220,7 @@ impl WidgetRef for &UpdatePromptScreen {
         column.push("");
         column.push(
             Line::from(vec![
-                "Release notes: ".dim(),
+                t("Release notes: ", "更新说明：").dim(),
                 "https://github.com/openai/codex/releases/latest"
                     .dim()
                     .underlined(),
@@ -213,25 +230,29 @@ impl WidgetRef for &UpdatePromptScreen {
         column.push("");
         column.push(selection_option_row(
             0,
-            format!("Update now (runs `{update_command}`)"),
+            if is_zh_locale() {
+                format!("立即更新（执行 `{update_command}`）")
+            } else {
+                format!("Update now (runs `{update_command}`)")
+            },
             self.highlighted == UpdateSelection::UpdateNow,
         ));
         column.push(selection_option_row(
             1,
-            "Skip".to_string(),
+            t("Skip", "暂不更新").to_string(),
             self.highlighted == UpdateSelection::NotNow,
         ));
         column.push(selection_option_row(
             2,
-            "Skip until next version".to_string(),
+            t("Skip until next version", "本版本不再提示").to_string(),
             self.highlighted == UpdateSelection::DontRemind,
         ));
         column.push("");
         column.push(
             Line::from(vec![
-                "Press ".dim(),
+                t("Press ", "按 ").dim(),
                 key_hint::plain(KeyCode::Enter).into(),
-                " to continue".dim(),
+                t(" to continue", " 继续").dim(),
             ])
             .inset(Insets::tlbr(0, 2, 0, 0)),
         );

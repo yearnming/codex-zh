@@ -17,6 +17,7 @@ use ratatui::text::Span;
 use ratatui::text::Text;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::WidgetRef;
+use std::env;
 use unicode_width::UnicodeWidthStr;
 
 use crate::app_event::AppEvent;
@@ -33,6 +34,22 @@ use crate::wrapping::word_wrap_lines;
 
 pub(crate) const STATUS_DETAILS_DEFAULT_MAX_LINES: usize = 3;
 const DETAILS_PREFIX: &str = "  └ ";
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if is_zh_locale() { zh } else { en }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatusDetailsCapitalization {
@@ -61,6 +78,20 @@ pub(crate) struct StatusIndicatorWidget {
 // Format elapsed seconds into a compact human-friendly form used by the status line.
 // Examples: 0s, 59s, 1m 00s, 59m 59s, 1h 00m 00s, 2h 03m 09s
 pub fn fmt_elapsed_compact(elapsed_secs: u64) -> String {
+    if is_zh_locale() {
+        if elapsed_secs < 60 {
+            return format!("{elapsed_secs}秒");
+        }
+        if elapsed_secs < 3600 {
+            let minutes = elapsed_secs / 60;
+            let seconds = elapsed_secs % 60;
+            return format!("{minutes}分 {seconds:02}秒");
+        }
+        let hours = elapsed_secs / 3600;
+        let minutes = (elapsed_secs % 3600) / 60;
+        let seconds = elapsed_secs % 60;
+        return format!("{hours}时 {minutes:02}分 {seconds:02}秒");
+    }
     if elapsed_secs < 60 {
         return format!("{elapsed_secs}s");
     }
@@ -82,7 +113,7 @@ impl StatusIndicatorWidget {
         animations_enabled: bool,
     ) -> Self {
         Self {
-            header: String::from("Working"),
+            header: t("Working", "工作中").to_string(),
             details: None,
             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
             inline_message: None,
@@ -258,10 +289,16 @@ impl Renderable for StatusIndicatorWidget {
         }
         spans.push(" ".into());
         if self.show_interrupt_hint {
+            let (hint_prefix, hint_suffix) = if is_zh_locale() {
+                ("按 ", " 中断)")
+            } else {
+                ("", " to interrupt)")
+            };
             spans.extend(vec![
                 format!("({pretty_elapsed} • ").dim(),
+                hint_prefix.dim(),
                 key_hint::plain(KeyCode::Esc).into(),
-                " to interrupt)".dim(),
+                hint_suffix.dim(),
             ]);
         } else {
             spans.push(format!("({pretty_elapsed})").dim());
@@ -304,16 +341,32 @@ mod tests {
 
     #[test]
     fn fmt_elapsed_compact_formats_seconds_minutes_hours() {
-        assert_eq!(fmt_elapsed_compact(0), "0s");
-        assert_eq!(fmt_elapsed_compact(1), "1s");
-        assert_eq!(fmt_elapsed_compact(59), "59s");
-        assert_eq!(fmt_elapsed_compact(60), "1m 00s");
-        assert_eq!(fmt_elapsed_compact(61), "1m 01s");
-        assert_eq!(fmt_elapsed_compact(3 * 60 + 5), "3m 05s");
-        assert_eq!(fmt_elapsed_compact(59 * 60 + 59), "59m 59s");
-        assert_eq!(fmt_elapsed_compact(3600), "1h 00m 00s");
-        assert_eq!(fmt_elapsed_compact(3600 + 60 + 1), "1h 01m 01s");
-        assert_eq!(fmt_elapsed_compact(25 * 3600 + 2 * 60 + 3), "25h 02m 03s");
+        if is_zh_locale() {
+            assert_eq!(fmt_elapsed_compact(0), "0秒");
+            assert_eq!(fmt_elapsed_compact(1), "1秒");
+            assert_eq!(fmt_elapsed_compact(59), "59秒");
+            assert_eq!(fmt_elapsed_compact(60), "1分 00秒");
+            assert_eq!(fmt_elapsed_compact(61), "1分 01秒");
+            assert_eq!(fmt_elapsed_compact(3 * 60 + 5), "3分 05秒");
+            assert_eq!(fmt_elapsed_compact(59 * 60 + 59), "59分 59秒");
+            assert_eq!(fmt_elapsed_compact(3600), "1时 00分 00秒");
+            assert_eq!(fmt_elapsed_compact(3600 + 60 + 1), "1时 01分 01秒");
+            assert_eq!(
+                fmt_elapsed_compact(25 * 3600 + 2 * 60 + 3),
+                "25时 02分 03秒"
+            );
+        } else {
+            assert_eq!(fmt_elapsed_compact(0), "0s");
+            assert_eq!(fmt_elapsed_compact(1), "1s");
+            assert_eq!(fmt_elapsed_compact(59), "59s");
+            assert_eq!(fmt_elapsed_compact(60), "1m 00s");
+            assert_eq!(fmt_elapsed_compact(61), "1m 01s");
+            assert_eq!(fmt_elapsed_compact(3 * 60 + 5), "3m 05s");
+            assert_eq!(fmt_elapsed_compact(59 * 60 + 59), "59m 59s");
+            assert_eq!(fmt_elapsed_compact(3600), "1h 00m 00s");
+            assert_eq!(fmt_elapsed_compact(3600 + 60 + 1), "1h 01m 01s");
+            assert_eq!(fmt_elapsed_compact(25 * 3600 + 2 * 60 + 3), "25h 02m 03s");
+        }
     }
 
     #[test]

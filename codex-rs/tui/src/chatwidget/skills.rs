@@ -23,6 +23,10 @@ use codex_protocol::protocol::ListSkillsResponseEvent;
 use codex_protocol::protocol::SkillMetadata as ProtocolSkillMetadata;
 use codex_protocol::protocol::SkillsListEntry;
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 impl ChatWidget {
     pub(crate) fn open_skills_list(&mut self) {
         self.insert_str("$");
@@ -31,8 +35,14 @@ impl ChatWidget {
     pub(crate) fn open_skills_menu(&mut self) {
         let items = vec![
             SelectionItem {
-                name: "List skills".to_string(),
-                description: Some("Tip: press $ to open this list directly.".to_string()),
+                name: t("List skills", "技能列表").to_string(),
+                description: Some(
+                    t(
+                        "Tip: press $ to open this list directly.",
+                        "提示：按 $ 可直接打开此列表。",
+                    )
+                    .to_string(),
+                ),
                 actions: vec![Box::new(|tx| {
                     tx.send(AppEvent::OpenSkillsList);
                 })],
@@ -40,8 +50,8 @@ impl ChatWidget {
                 ..Default::default()
             },
             SelectionItem {
-                name: "Enable/Disable Skills".to_string(),
-                description: Some("Enable or disable skills.".to_string()),
+                name: t("Enable/Disable Skills", "启用/停用技能").to_string(),
+                description: Some(t("Enable or disable skills.", "启用或停用技能。").to_string()),
                 actions: vec![Box::new(|tx| {
                     tx.send(AppEvent::OpenManageSkillsPopup);
                 })],
@@ -51,8 +61,8 @@ impl ChatWidget {
         ];
 
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            title: Some("Skills".to_string()),
-            subtitle: Some("Choose an action".to_string()),
+            title: Some(t("Skills", "技能").to_string()),
+            subtitle: Some(t("Choose an action", "选择操作").to_string()),
             footer_hint: Some(standard_popup_hint_line()),
             items,
             ..Default::default()
@@ -61,7 +71,10 @@ impl ChatWidget {
 
     pub(crate) fn open_manage_skills_popup(&mut self) {
         if self.skills_all.is_empty() {
-            self.add_info_message("No skills available.".to_string(), None);
+            self.add_info_message(
+                t("No skills available.", "没有可用技能。").to_string(),
+                None,
+            );
             return;
         }
 
@@ -132,7 +145,11 @@ impl ChatWidget {
             return;
         }
         self.add_info_message(
-            format!("{enabled_count} skills enabled, {disabled_count} skills disabled"),
+            if crate::is_zh_locale() {
+                format!("已启用 {enabled_count} 个技能，已停用 {disabled_count} 个技能")
+            } else {
+                format!("{enabled_count} skills enabled, {disabled_count} skills disabled")
+            },
             None,
         );
     }

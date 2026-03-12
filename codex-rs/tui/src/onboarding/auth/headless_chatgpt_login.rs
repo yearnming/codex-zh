@@ -23,6 +23,10 @@ use super::ContinueWithDeviceCodeState;
 use super::SignInState;
 use super::mark_url_hyperlink;
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if super::is_zh_locale() { zh } else { en }
+}
+
 pub(super) fn start_headless_chatgpt_login(widget: &mut AuthModeWidget, mut opts: ServerOptions) {
     opts.open_browser = false;
     let sign_in_state = widget.sign_in_state.clone();
@@ -136,9 +140,9 @@ pub(super) fn render_device_code_login(
     state: &ContinueWithDeviceCodeState,
 ) {
     let banner = if state.device_code.is_some() {
-        "Finish signing in via your browser"
+        t("Finish signing in via your browser", "在浏览器中完成登录")
     } else {
-        "Preparing device code login"
+        t("Preparing device code login", "正在准备设备码登录")
     };
 
     let mut spans = vec!["  ".into()];
@@ -156,7 +160,13 @@ pub(super) fn render_device_code_login(
 
     // Capture the verification URL for OSC 8 hyperlink marking after render.
     let verification_url = if let Some(device_code) = &state.device_code {
-        lines.push("  1. Open this link in your browser and sign in".into());
+        lines.push(
+            t(
+                "  1. Open this link in your browser and sign in",
+                "  1. 在浏览器中打开此链接并登录",
+            )
+            .into(),
+        );
         lines.push("".into());
         lines.push(Line::from(vec![
             "  ".into(),
@@ -164,7 +174,11 @@ pub(super) fn render_device_code_login(
         ]));
         lines.push("".into());
         lines.push(
-            "  2. Enter this one-time code after you are signed in (expires in 15 minutes)".into(),
+            t(
+                "  2. Enter this one-time code after you are signed in (expires in 15 minutes)",
+                "  2. 登录后输入此一次性代码（15 分钟后过期）",
+            )
+            .into(),
         );
         lines.push("".into());
         lines.push(Line::from(vec![
@@ -173,19 +187,26 @@ pub(super) fn render_device_code_login(
         ]));
         lines.push("".into());
         lines.push(
-            "  Device codes are a common phishing target. Never share this code."
-                .dim()
-                .into(),
+            t(
+                "  Device codes are a common phishing target. Never share this code.",
+                "  设备码常被用于钓鱼攻击，切勿分享该代码。",
+            )
+            .dim()
+            .into(),
         );
         lines.push("".into());
         Some(device_code.verification_url.clone())
     } else {
-        lines.push("  Requesting a one-time code...".dim().into());
+        lines.push(
+            t("  Requesting a one-time code...", "  正在请求一次性代码…")
+                .dim()
+                .into(),
+        );
         lines.push("".into());
         None
     };
 
-    lines.push("  Press Esc to cancel".dim().into());
+    lines.push(t("  Press Esc to cancel", "  按 Esc 取消").dim().into());
     Paragraph::new(lines)
         .wrap(Wrap { trim: false })
         .render(area, buf);

@@ -30,6 +30,10 @@ pub(crate) const TOOL_CALL_MAX_LINES: usize = 5;
 const USER_SHELL_TOOL_CALL_MAX_LINES: usize = 50;
 const MAX_INTERACTION_PREVIEW_CHARS: usize = 80;
 
+fn t(en: &'static str, zh: &'static str) -> &'static str {
+    if crate::is_zh_locale() { zh } else { en }
+}
+
 pub(crate) struct OutputLinesParams {
     pub(crate) line_limit: usize,
     pub(crate) only_err: bool,
@@ -66,12 +70,23 @@ fn format_unified_exec_interaction(command: &[String], input: Option<&str>) -> S
     } else {
         command.join(" ")
     };
+    let zh = crate::is_zh_locale();
     match input {
         Some(data) if !data.is_empty() => {
             let preview = summarize_interaction_input(data);
-            format!("Interacted with `{command_display}`, sent `{preview}`")
+            if zh {
+                format!("与 `{command_display}` 交互，发送 `{preview}`")
+            } else {
+                format!("Interacted with `{command_display}`, sent `{preview}`")
+            }
         }
-        _ => format!("Waited for `{command_display}`"),
+        _ => {
+            if zh {
+                format!("等待 `{command_display}`")
+            } else {
+                format!("Waited for `{command_display}`")
+            }
+        }
     }
 }
 
@@ -328,7 +343,7 @@ impl ExecCell {
                             lines.push(("Search", spans));
                         }
                         ParsedCommand::Unknown { cmd } => {
-                            lines.push(("Run", vec![cmd.clone().into()]));
+                            lines.push((t("Run", "运行"), vec![cmd.clone().into()]));
                         }
                     }
                 }
@@ -368,11 +383,11 @@ impl ExecCell {
         let title = if is_interaction {
             ""
         } else if self.is_active() {
-            "Running"
+            t("Running", "运行中")
         } else if call.is_user_shell_command() {
-            "You ran"
+            t("You ran", "你运行了")
         } else {
-            "Ran"
+            t("Ran", "已运行")
         };
 
         let mut header_line = if is_interaction {

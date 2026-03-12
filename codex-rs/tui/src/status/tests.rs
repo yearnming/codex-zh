@@ -20,8 +20,37 @@ use codex_protocol::protocol::TokenUsageInfo;
 use insta::assert_snapshot;
 use pretty_assertions::assert_eq;
 use ratatui::prelude::*;
+use std::env;
 use std::path::PathBuf;
 use tempfile::TempDir;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
+
+fn directory_label() -> &'static str {
+    if is_zh_locale() {
+        "目录"
+    } else {
+        "Directory"
+    }
+}
+
+fn permissions_label() -> &'static str {
+    if is_zh_locale() {
+        "权限"
+    } else {
+        "Permissions"
+    }
+}
 
 async fn test_config(temp_home: &TempDir) -> Config {
     ConfigBuilder::default()
@@ -62,13 +91,16 @@ fn render_lines(lines: &[Line<'static>]) -> Vec<String> {
 }
 
 fn sanitize_directory(lines: Vec<String>) -> Vec<String> {
+    let label = directory_label();
+    let label_with_colon = format!("{label}: ");
     lines
         .into_iter()
         .map(|line| {
-            if let (Some(dir_pos), Some(pipe_idx)) = (line.find("Directory: "), line.rfind('│')) {
-                let prefix = &line[..dir_pos + "Directory: ".len()];
+            if let (Some(dir_pos), Some(pipe_idx)) = (line.find(&label_with_colon), line.rfind('│'))
+            {
+                let prefix = &line[..dir_pos + label_with_colon.len()];
                 let suffix = &line[pipe_idx..];
-                let content_width = pipe_idx.saturating_sub(dir_pos + "Directory: ".len());
+                let content_width = pipe_idx.saturating_sub(dir_pos + label_with_colon.len());
                 let replacement = "[[workspace]]";
                 let mut rebuilt = prefix.to_string();
                 rebuilt.push_str(replacement);
@@ -221,19 +253,21 @@ async fn status_permissions_non_default_workspace_write_is_custom() {
     let rendered_lines = render_lines(&composite.display_lines(80));
     let permissions_line = rendered_lines
         .iter()
-        .find(|line| line.contains("Permissions:"))
+        .find(|line| line.contains(&format!("{}:", permissions_label())))
         .expect("permissions line");
     let permissions_text = permissions_line
-        .split("Permissions:")
+        .split(&format!("{}:", permissions_label()))
         .nth(1)
         .map(str::trim)
         .map(|text| text.trim_end_matches('│'))
         .map(str::trim);
 
-    assert_eq!(
-        permissions_text,
-        Some("Custom (workspace-write with network access, on-request)")
-    );
+    let expected = if is_zh_locale() {
+        "自定义（工作区可写（允许网络），按需审批）"
+    } else {
+        "Custom (workspace-write with network access, on-request)"
+    };
+    assert_eq!(permissions_text, Some(expected));
 }
 
 #[tokio::test]
@@ -393,10 +427,20 @@ async fn status_snapshot_shows_unlimited_credits() {
         None,
     );
     let rendered = render_lines(&composite.display_lines(120));
+    let credits_label = if is_zh_locale() {
+        "额度:"
+    } else {
+        "Credits:"
+    };
+    let credits_value = if is_zh_locale() {
+        "无限"
+    } else {
+        "Unlimited"
+    };
     assert!(
         rendered
             .iter()
-            .any(|line| line.contains("Credits:") && line.contains("Unlimited")),
+            .any(|line| line.contains(credits_label) && line.contains(credits_value)),
         "expected Credits: Unlimited line, got {rendered:?}"
     );
 }
@@ -442,10 +486,20 @@ async fn status_snapshot_shows_positive_credits() {
         None,
     );
     let rendered = render_lines(&composite.display_lines(120));
+    let credits_label = if is_zh_locale() {
+        "额度:"
+    } else {
+        "Credits:"
+    };
+    let credits_value = if is_zh_locale() {
+        "13 额度"
+    } else {
+        "13 credits"
+    };
     assert!(
         rendered
             .iter()
-            .any(|line| line.contains("Credits:") && line.contains("13 credits")),
+            .any(|line| line.contains(credits_label) && line.contains(credits_value)),
         "expected Credits line with rounded credits, got {rendered:?}"
     );
 }
@@ -491,8 +545,13 @@ async fn status_snapshot_hides_zero_credits() {
         None,
     );
     let rendered = render_lines(&composite.display_lines(120));
+    let credits_label = if is_zh_locale() {
+        "额度:"
+    } else {
+        "Credits:"
+    };
     assert!(
-        rendered.iter().all(|line| !line.contains("Credits:")),
+        rendered.iter().all(|line| !line.contains(credits_label)),
         "expected no Credits line, got {rendered:?}"
     );
 }
@@ -538,8 +597,13 @@ async fn status_snapshot_hides_when_has_no_credits_flag() {
         None,
     );
     let rendered = render_lines(&composite.display_lines(120));
+    let credits_label = if is_zh_locale() {
+        "额度:"
+    } else {
+        "Credits:"
+    };
     assert!(
-        rendered.iter().all(|line| !line.contains("Credits:")),
+        rendered.iter().all(|line| !line.contains(credits_label)),
         "expected no Credits line when has_credits is false, got {rendered:?}"
     );
 }
@@ -1014,9 +1078,14 @@ async fn status_context_window_uses_last_usage() {
         None,
     );
     let rendered_lines = render_lines(&composite.display_lines(80));
+    let context_label = if is_zh_locale() {
+        "上下文窗口"
+    } else {
+        "Context window"
+    };
     let context_line = rendered_lines
         .into_iter()
-        .find(|line| line.contains("Context window"))
+        .find(|line| line.contains(context_label))
         .expect("context line");
 
     assert!(

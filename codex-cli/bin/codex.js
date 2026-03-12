@@ -27,9 +27,10 @@ function detectLocale() {
   if (process.env.CODEX_LOCALE) {
     return normalizeLocale(process.env.CODEX_LOCALE);
   }
-  return normalizeLocale(
+  const systemLocale = normalizeLocale(
     process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || "",
   );
+  return systemLocale || "zh-CN";
 }
 
 function loadTranslations(locale) {

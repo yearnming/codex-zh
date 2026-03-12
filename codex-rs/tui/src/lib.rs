@@ -126,15 +126,10 @@ fn normalize_locale(value: &str) -> String {
 }
 
 fn is_zh_locale() -> bool {
-    let locale = env::var("CODEX_LOCALE")
-        .ok()
-        .filter(|v| !v.is_empty())
-        .or_else(|| env::var("LC_ALL").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LC_MESSAGES").ok().filter(|v| !v.is_empty()))
-        .or_else(|| env::var("LANG").ok().filter(|v| !v.is_empty()));
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
 
     let Some(locale) = locale else {
-        return false;
+        return true;
     };
     normalize_locale(&locale).starts_with("zh")
 }
@@ -287,11 +282,19 @@ mod voice {
 
     impl RealtimeAudioPlayer {
         pub(crate) fn start(_config: &Config) -> Result<Self, String> {
-            Err("voice output is unavailable in this build".to_string())
+            Err(if super::is_zh_locale() {
+                "当前构建不支持语音输出".to_string()
+            } else {
+                "voice output is unavailable in this build".to_string()
+            })
         }
 
         pub(crate) fn enqueue_frame(&self, _frame: &RealtimeAudioFrame) -> Result<(), String> {
-            Err("voice output is unavailable in this build".to_string())
+            Err(if super::is_zh_locale() {
+                "当前构建不支持语音输出".to_string()
+            } else {
+                "voice output is unavailable in this build".to_string()
+            })
         }
 
         pub(crate) fn clear(&self) {}
@@ -305,7 +308,11 @@ mod voice {
     ) {
         tx.send(AppEvent::TranscriptionFailed {
             id,
-            error: "voice input is unavailable in this build".to_string(),
+            error: if super::is_zh_locale() {
+                "当前构建不支持语音输入".to_string()
+            } else {
+                "voice input is unavailable in this build".to_string()
+            },
         });
     }
 }

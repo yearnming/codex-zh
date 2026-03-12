@@ -3,12 +3,12 @@ source: tui/src/bottom_pane/mcp_server_elicitation.rs
 expression: "render_snapshot(&overlay, Rect::new(0, 0, 120, 16))"
 ---
                                                                                                                         
-  Field 1/1                                                                                                             
+  字段 1/1                                                                                                               
   Allow this request?                                                                                                   
-  › 1. Approve Once          Run the tool and continue.                                                                 
-    2. Approve this session  Run the tool and remember this choice for this session.                                    
-    3. Always allow          Run the tool and remember this choice for future tool calls.                               
-    4. Cancel                Cancel this tool call                                                                      
+  › 1. 仅本次允许     运行该工具并继续。                                                                                  
+    2. 仅本会话允许  运行该工具，并在本会话中记住此选择。                                                                
+    3. 始终允许      运行该工具，并在未来的调用中记住此选择。                                                            
+    4. 取消          取消本次工具调用                                                                                    
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -16,4 +16,4 @@ expression: "render_snapshot(&overlay, Rect::new(0, 0, 120, 16))"
                                                                                                                         
                                                                                                                         
                                                                                                                         
-  enter to submit | esc to cancel
+  回车提交全部 | Esc 取消                                                                                                

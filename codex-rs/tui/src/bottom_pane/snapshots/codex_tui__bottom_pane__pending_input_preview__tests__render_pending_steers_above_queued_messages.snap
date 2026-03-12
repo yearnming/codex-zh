@@ -5,14 +5,14 @@ expression: "format!(\"{buf:?}\")"
 Buffer {
     area: Rect { x: 0, y: 0, width: 52, height: 8 },
     content: [
-        "• Messages to be submitted after next tool call     ",
-        "  (press esc to interrupt and send immediately)     ",
-        "  ↳ Please continue.                                ",
+        "• 将在下一次工具调用后提交的消息     ",
+        "  （按 esc 中断并立即发送）                 ",
+        "  ↳ 请继续。                                          ",
         "  ↳ Check the last command output.                  ",
         "                                                    ",
-        "• Queued follow-up messages                         ",
-        "  ↳ Queued follow-up question                       ",
-        "    ⌥ + ↑ edit last queued message                  ",
+        "• 已排队的后续消息                         ",
+        "  ↳ 排队的后续问题                             ",
+        "    ⌥ + ↑ 编辑最近排队的消息                   ",
     ],
     styles: [
         x: 0, y: 0, fg: Reset, bg: Reset, underline: Reset, modifier: DIM,

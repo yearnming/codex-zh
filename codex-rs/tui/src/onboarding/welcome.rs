@@ -12,6 +12,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::WidgetRef;
 use ratatui::widgets::Wrap;
 use std::cell::Cell;
+use std::env;
 
 use crate::ascii_animation::AsciiAnimation;
 use crate::onboarding::onboarding_screen::KeyboardHandler;
@@ -22,6 +23,18 @@ use super::onboarding_screen::StepState;
 
 const MIN_ANIMATION_HEIGHT: u16 = 37;
 const MIN_ANIMATION_WIDTH: u16 = 60;
+
+fn normalize_locale(value: &str) -> String {
+    value.replace('_', "-").replace('.', "-").to_lowercase()
+}
+
+fn is_zh_locale() -> bool {
+    let locale = env::var("CODEX_LOCALE").ok().filter(|v| !v.is_empty());
+    let Some(locale) = locale else {
+        return true;
+    };
+    normalize_locale(&locale).starts_with("zh")
+}
 
 pub(crate) struct WelcomeWidget {
     pub is_logged_in: bool,
@@ -83,12 +96,22 @@ impl WidgetRef for &WelcomeWidget {
             lines.extend(frame.lines().map(Into::into));
             lines.push("".into());
         }
-        lines.push(Line::from(vec![
-            "  ".into(),
-            "Welcome to ".into(),
-            "Codex".bold(),
-            ", OpenAI's command-line coding agent".into(),
-        ]));
+        let welcome_line = if is_zh_locale() {
+            Line::from(vec![
+                "  ".into(),
+                "欢迎使用 ".into(),
+                "Codex".bold(),
+                "，OpenAI 的命令行编码 Agent".into(),
+            ])
+        } else {
+            Line::from(vec![
+                "  ".into(),
+                "Welcome to ".into(),
+                "Codex".bold(),
+                ", OpenAI's command-line coding agent".into(),
+            ])
+        };
+        lines.push(welcome_line);
 
         Paragraph::new(lines)
             .wrap(Wrap { trim: false })
@@ -134,7 +157,8 @@ mod tests {
         let frame_lines = widget.animation.current_frame().lines().count() as u16;
         (&widget).render(area, &mut buf);
 
-        let welcome_row = row_containing(&buf, "Welcome");
+        let needle = if is_zh_locale() { "欢迎" } else { "Welcome" };
+        let welcome_row = row_containing(&buf, needle);
         assert_eq!(welcome_row, Some(frame_lines + 1));
     }
 
@@ -145,7 +169,8 @@ mod tests {
         let mut buf = Buffer::empty(area);
         (&widget).render(area, &mut buf);
 
-        let welcome_row = row_containing(&buf, "Welcome");
+        let needle = if is_zh_locale() { "欢迎" } else { "Welcome" };
+        let welcome_row = row_containing(&buf, needle);
         assert_eq!(welcome_row, Some(0));
     }
 
